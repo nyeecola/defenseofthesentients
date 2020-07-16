@@ -1,0 +1,19 @@
+TO DOs:
+- Top-down view
+- Movement with WASD
+- Gridlike map
+- Collision detection based on grid at first, maybe improve later to only use grid for optimization (searching for obstacles)
+- Dumb straight path enemies
+- Shooting mechanics
+- Waves
+- Camera movement
+- Animation
+- Smart pathfinding for enemies
+- Map editor mode
+- Field of view for player
+- Friendly NPCs
+- Building
+- NPCs can build too
+- Different weapons and acessories (grenades, mines, lasers, c4, etc)
+- Economy
+- Field of view for enemies (do we really need this? may not be good for gameplay, test it!)

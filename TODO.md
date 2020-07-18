@@ -1,7 +1,9 @@
 TO DOs:
-- Top-down view
-- Movement with WASD
 - Gridlike map
+	- Motivation:
+		- facilitate collision detection (semi-true)
+		- facilitate pathfinding
+		- facilitate building (questionable)
 - Collision detection based on grid at first, maybe improve later to only use grid for optimization (searching for obstacles)
 - Dumb straight path enemies
 - Shooting mechanics
@@ -17,3 +19,6 @@ TO DOs:
 - Different weapons and acessories (grenades, mines, lasers, c4, etc)
 - Economy
 - Field of view for enemies (do we really need this? may not be good for gameplay, test it!)
+
+CONSIDER:
+- move camera independent of player

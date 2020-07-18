@@ -113,8 +113,8 @@ void draw_model_impl(int program, Object obj, bool force_color)
 {
     mat4 mat;
     glm_mat4_identity(mat);
-    glm_scale_uni(mat, obj.scale);
     glm_translate(mat, obj.pos);
+    glm_scale_uni(mat, obj.scale);
     glUniform1i(glGetUniformLocation(program, "forceColor"), force_color);
     glUniform1i(glGetUniformLocation(program, "hasTexture"), loaded_models[obj.model_id].has_texture);
     glUniform1i(glGetUniformLocation(program, "shininess"), obj.shininess);

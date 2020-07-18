@@ -163,15 +163,16 @@ int main(int argc, char** argv) {
     int man_id = loadModel("assets/man.obj", NULL, VERTEX_TEXTURE, 1024);
     int plane_id = loadModel("assets/plane.obj", NULL, VERTEX_TEXTURE, 1024);
 
-
     // create player object
     Object man = create_object(man_id, 0, 0, 0, 5, 2, 2);
+    Object man2 = create_object(man_id, 5, 0, 3, 5, 2, 2);
 
     // create placeholder ground object
     Object plane = create_object(plane_id, 0, 0, 0, 0, 1, 256);
 
-    vec3 camera_pos = { 0, 30, 0 };
-    vec3 camera_up = { 0, 0, -1 };
+    // initialize camera data
+    vec3 camera_pos = { 0, 35, 0 };
+    vec3 camera_up = { 0, 0, -1 }; /* TODO: positive or negative? */
 
     float delta_time = glfwGetTime();
     float last_time = glfwGetTime();
@@ -196,19 +197,21 @@ int main(int argc, char** argv) {
         /* input handling */
         vec3 dir = { 0 };
         if (glfwGetKey(window, GLFW_KEY_W)) {
-            dir[2] = -man.speed;
+            dir[2] = -1;
         }
         if (glfwGetKey(window, GLFW_KEY_A)) {
-            dir[0] = -man.speed;
+            dir[0] = -1;
         }
         if (glfwGetKey(window, GLFW_KEY_S)) {
-            dir[2] = man.speed;
+            dir[2] = 1;
         }
         if (glfwGetKey(window, GLFW_KEY_D)) {
-            dir[0] = man.speed;
+            dir[0] = 1;
         }
-        glm_vec3_scale(dir, delta_time, dir);
+        glm_vec3_normalize(dir);
+        glm_vec3_scale(dir, man.speed * delta_time, dir);
         glm_vec3_add(man.pos, dir, man.pos);
+        glm_vec3_add(camera_pos, dir, camera_pos);
 
 
         float ratio;
@@ -244,6 +247,9 @@ int main(int argc, char** argv) {
 
         // draw man
         draw_model(program, man);
+
+        // draw NPC
+        draw_model(program, man2);
 
         // draw plane
         draw_model_force_rgb(program, plane, 0.8, 0.7, 0.7);

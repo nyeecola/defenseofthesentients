@@ -163,19 +163,16 @@ int main(int argc, char** argv) {
     glGenBuffers(1, &vbo1);
     glGenBuffers(1, &vbo2);
 
-    GLuint vao;
-    glGenVertexArrays(1, &vao);
-
     // init monkey
     int monkey_id = loadModel("assets/monkey.obj", NULL, VERTEX_TEXTURE, 1024);
 
     // init object array
+    glGenVertexArrays(1, &monkey.vao);
     monkey.model_id = monkey_id;
     glm_mat4_identity(monkey.mat);
-    glm_scale_uni(monkey.mat, 0.6);
-    monkey.pos[0] = 2; /* (2, 0, 0) */
+    glm_scale_uni(monkey.mat, 0.6); /* this is slightly dangerous, be careful to not change scale after startup */
 
-    glBindVertexArray(vao);
+    glBindVertexArray(monkey.vao);
         // NOTE: OpenGL error checks have been omitted for brevity
         glBindBuffer(GL_ARRAY_BUFFER, vbo1);
         glBufferData(GL_ARRAY_BUFFER, loaded_models[monkey.model_id].num_faces * 3 * sizeof(vec3), loaded_models[monkey.model_id].vertices, GL_STREAM_DRAW);
@@ -190,14 +187,7 @@ int main(int argc, char** argv) {
 
     POLL_GL_ERROR;
 
-
-    mat4 mvp;
-
     vec3 camera_pos = { 0, 0, -5 };
-    
-    mat4 view_mat;
-    glm_mat4_identity(view_mat);
-    glm_translate(view_mat, camera_pos);
 
     float delta_time = glfwGetTime();
     float last_time = glfwGetTime();
@@ -208,8 +198,6 @@ int main(int argc, char** argv) {
         delta_time = glfwGetTime() - last_time;
         last_time += delta_time;
 
-        delta_time *= 3;
-
         float ratio;
         int width, height;
         glfwGetFramebufferSize(window, &width, &height);
@@ -218,36 +206,33 @@ int main(int argc, char** argv) {
         glm_perspective(GLM_PI_4f, ratio, 0.01f, 300.0f, proj_mat);
 
 
+        mat4 view_mat;
+        glm_mat4_identity(view_mat);
+        glm_translate(view_mat, camera_pos);
+
+        mat4 view_proj;
+        glm_mat4_identity(view_proj);
+        glm_mat4_mul(proj_mat, view_mat, view_proj);
+
+
         glEnable(GL_DEPTH_TEST);
         glDisable(GL_CULL_FACE);
         glViewport(0, 0, width, height);
         glClearColor(0.0, 0.0, 0.0, 1);
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
-#if 0
-        drawModel(monkey_id);
-#else
-        // TODO: normals
-
-        mat4 tmp_view;
-        glm_mat4_copy(view_mat, tmp_view);
-        glm_translate(tmp_view, monkey.pos);
-
-        glm_mat4_identity(mvp);
-        glm_mat4_mul(proj_mat, tmp_view, mvp);
-        glm_mat4_mul(mvp, monkey.mat, mvp);
-
         vec3 light_pos = { -5, 5, 10 };
 
         glUseProgram(program);
-        glBindVertexArray(vao);
-            glUniform3fv(glGetUniformLocation(program, "lightPos"), 1, light_pos);
-            glUniform3fv(glGetUniformLocation(program, "cameraPos"), 1, camera_pos);
-            glUniformMatrix4fv(glGetUniformLocation(program, "model"), 1, GL_FALSE, (const GLfloat*)monkey.mat);
-            glUniformMatrix4fv(glGetUniformLocation(program, "MVP"), 1, GL_FALSE, (const GLfloat*)mvp);
-            glDrawArrays(GL_TRIANGLES, 0, 3 * loaded_models[monkey.model_id].num_faces);
-        glBindVertexArray(0);
-#endif
+
+        glUniform3fv(glGetUniformLocation(program, "lightPos"), 1, light_pos);
+        glUniform3fv(glGetUniformLocation(program, "cameraPos"), 1, camera_pos);
+        glUniformMatrix4fv(glGetUniformLocation(program, "view_proj"), 1, GL_FALSE, (const GLfloat*)view_proj);
+
+        vec3 monkey_pos = { 0, 0, 2 };
+        obj_translate(monkey, monkey_pos);
+
+        draw_model(program, monkey);
 
         glfwSwapBuffers(window);
         glfwPollEvents();

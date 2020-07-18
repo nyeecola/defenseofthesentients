@@ -68,6 +68,7 @@ int loadModel(const char* obj_filename, const char* texture_filename, FaceType f
     Model* model = &loaded_models[loaded_models_n];
 
     if (face_type == VERTEX_ALL || face_type == VERTEX_ALL_ALPHA) {
+        model->has_texture = true;
         // TODO
         //model->texture_id = loadTexture(texture_filename, face_type, texture_size);
     }
@@ -112,10 +113,24 @@ void obj_translate(Object model, vec3 pos) {
     glm_translate(model.mat, pos);
 }
 
-void draw_model(int program, Object model)
+void draw_model_impl(int program, Object obj, bool force_color)
 {
-    glUniformMatrix4fv(glGetUniformLocation(program, "model"), 1, GL_FALSE, (const GLfloat*)monkey.mat);
-    glBindVertexArray(model.vao);
-    glDrawArrays(GL_TRIANGLES, 0, 3 * loaded_models[monkey.model_id].num_faces);
+    glUniform1i(glGetUniformLocation(program, "forceColor"), force_color);
+    glUniform1i(glGetUniformLocation(program, "hasTexture"), loaded_models[obj.model_id].has_texture);
+    glUniformMatrix4fv(glGetUniformLocation(program, "model"), 1, GL_FALSE, (const GLfloat*)obj.mat);
+    glBindVertexArray(obj.vao);
+    glDrawArrays(GL_TRIANGLES, 0, 3 * loaded_models[obj.model_id].num_faces);
     glBindVertexArray(0);
+}
+
+void draw_model(int program, Object obj)
+{
+    draw_model_impl(program, obj, false);
+}
+
+void draw_model_force_rgb(int program, Object obj, float r, float g, float b)
+{
+    vec3 color = { r, g, b };
+    glUniform3fv(glGetUniformLocation(program, "forcedColor"), 1, color);
+    draw_model_impl(program, obj, true);
 }

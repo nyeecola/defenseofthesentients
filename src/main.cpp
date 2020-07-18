@@ -158,36 +158,69 @@ int main(int argc, char** argv) {
         if (shader_info_len) printf("Shader Program: %s\n", shader_info_buffer);
     }
 
-    // TODO: when can I reuse this?
-    GLuint vbo1, vbo2;
-    glGenBuffers(1, &vbo1);
-    glGenBuffers(1, &vbo2);
-
-    // init monkey
+    // load models
     int monkey_id = loadModel("assets/monkey.obj", NULL, VERTEX_TEXTURE, 1024);
+    int man_id = loadModel("assets/man.obj", NULL, VERTEX_TEXTURE, 1024);
+    int plane_id = loadModel("assets/plane.obj", NULL, VERTEX_TEXTURE, 1024);
 
-    // init object array
-    glGenVertexArrays(1, &monkey.vao);
-    monkey.model_id = monkey_id;
-    glm_mat4_identity(monkey.mat);
-    glm_scale_uni(monkey.mat, 0.6); /* this is slightly dangerous, be careful to not change scale after startup */
 
-    glBindVertexArray(monkey.vao);
+    // init man object array
+    Object man;
+    glGenVertexArrays(1, &man.vao);
+    man.model_id = man_id;
+    glm_mat4_identity(man.mat);
+    glm_scale_uni(man.mat, 2); /* this is slightly dangerous, be careful to not change scale after startup */
+
+    glBindVertexArray(man.vao);
+    {
         // NOTE: OpenGL error checks have been omitted for brevity
+        GLuint vbo1, vbo2;
+        glGenBuffers(1, &vbo1);
+        glGenBuffers(1, &vbo2);
+
         glBindBuffer(GL_ARRAY_BUFFER, vbo1);
-        glBufferData(GL_ARRAY_BUFFER, loaded_models[monkey.model_id].num_faces * 3 * sizeof(vec3), loaded_models[monkey.model_id].vertices, GL_STREAM_DRAW);
+        glBufferData(GL_ARRAY_BUFFER, loaded_models[man.model_id].num_faces * 3 * sizeof(vec3), loaded_models[man.model_id].vertices, GL_STREAM_DRAW);
         glEnableVertexAttribArray(0);
         glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, sizeof(float) * 3, (void*)0);
 
         glBindBuffer(GL_ARRAY_BUFFER, vbo2);
-        glBufferData(GL_ARRAY_BUFFER, loaded_models[monkey.model_id].num_faces * 3 * sizeof(vec3), loaded_models[monkey.model_id].normals, GL_STREAM_DRAW);
+        glBufferData(GL_ARRAY_BUFFER, loaded_models[man.model_id].num_faces * 3 * sizeof(vec3), loaded_models[man.model_id].normals, GL_STREAM_DRAW);
         glEnableVertexAttribArray(1);
         glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, sizeof(float) * 3, (void*)0);
+    }
     glBindVertexArray(0);
+
+
+    // init plane object array
+    Object plane;
+    glGenVertexArrays(1, &plane.vao);
+    plane.model_id = plane_id;
+    glm_mat4_identity(plane.mat);
+
+    glBindVertexArray(plane.vao);
+    {
+        GLuint vbo1, vbo2;
+        glGenBuffers(1, &vbo1);
+        glGenBuffers(1, &vbo2);
+
+        // NOTE: OpenGL error checks have been omitted for brevity
+        glBindBuffer(GL_ARRAY_BUFFER, vbo1);
+        glBufferData(GL_ARRAY_BUFFER, loaded_models[plane.model_id].num_faces * 3 * sizeof(vec3), loaded_models[plane.model_id].vertices, GL_STREAM_DRAW);
+        glEnableVertexAttribArray(0);
+        glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, sizeof(float) * 3, (void*)0);
+
+        glBindBuffer(GL_ARRAY_BUFFER, vbo2);
+        glBufferData(GL_ARRAY_BUFFER, loaded_models[plane.model_id].num_faces * 3 * sizeof(vec3), loaded_models[plane.model_id].normals, GL_STREAM_DRAW);
+        glEnableVertexAttribArray(1);
+        glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, sizeof(float) * 3, (void*)0);
+    }
+    glBindVertexArray(0);
+
 
     POLL_GL_ERROR;
 
-    vec3 camera_pos = { 0, 0, -5 };
+    vec3 camera_pos = { 0, 30, 0 };
+    vec3 camera_up = { 0, 0, -1 };
 
     float delta_time = glfwGetTime();
     float last_time = glfwGetTime();
@@ -207,8 +240,8 @@ int main(int argc, char** argv) {
 
 
         mat4 view_mat;
-        glm_mat4_identity(view_mat);
-        glm_translate(view_mat, camera_pos);
+        vec3 camera_target = { camera_pos[0], 0, camera_pos[2] };
+        glm_lookat(camera_pos, camera_target, camera_up, view_mat);
 
         mat4 view_proj;
         glm_mat4_identity(view_proj);
@@ -229,10 +262,13 @@ int main(int argc, char** argv) {
         glUniform3fv(glGetUniformLocation(program, "cameraPos"), 1, camera_pos);
         glUniformMatrix4fv(glGetUniformLocation(program, "view_proj"), 1, GL_FALSE, (const GLfloat*)view_proj);
 
-        vec3 monkey_pos = { 0, 0, 2 };
-        obj_translate(monkey, monkey_pos);
+        // draw man
+        vec3 man_pos = { 0, 0, 2 };
+        obj_translate(man, man_pos);
+        draw_model(program, man);
 
-        draw_model(program, monkey);
+        // draw plane
+        draw_model_force_rgb(program, plane, 1, 0.7, 0.5);
 
         glfwSwapBuffers(window);
         glfwPollEvents();

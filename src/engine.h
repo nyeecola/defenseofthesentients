@@ -20,6 +20,7 @@ struct Model {
     vec3* normals;
     vec2* texture_coords;
     int num_faces;
+    bool has_texture;
 };
 
 typedef struct {

@@ -109,15 +109,15 @@ int loadModel(const char* obj_filename, const char* texture_filename, FaceType f
     return loaded_models_n++;
 }
 
-void obj_translate(Object model, vec3 pos) {
-    glm_translate(model.mat, pos);
-}
-
 void draw_model_impl(int program, Object obj, bool force_color)
 {
+    mat4 mat;
+    glm_mat4_identity(mat);
+    glm_scale_uni(mat, obj.scale);
+    glm_translate(mat, obj.pos);
     glUniform1i(glGetUniformLocation(program, "forceColor"), force_color);
     glUniform1i(glGetUniformLocation(program, "hasTexture"), loaded_models[obj.model_id].has_texture);
-    glUniformMatrix4fv(glGetUniformLocation(program, "model"), 1, GL_FALSE, (const GLfloat*)obj.mat);
+    glUniformMatrix4fv(glGetUniformLocation(program, "model"), 1, GL_FALSE, (const GLfloat*)mat);
     glBindVertexArray(obj.vao);
     glDrawArrays(GL_TRIANGLES, 0, 3 * loaded_models[obj.model_id].num_faces);
     glBindVertexArray(0);

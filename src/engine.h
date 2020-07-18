@@ -25,8 +25,11 @@ struct Model {
 
 typedef struct {
     int model_id; /* loaded_models[] */
-    mat4 mat; /* model mat */
     GLuint vao; /* vertex attrib obj */
+
+    float scale;
+    vec3 pos;
+    float speed; /* maybe separate this field in another struct */
 } Object;
 
 

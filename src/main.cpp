@@ -117,7 +117,7 @@ int main(int argc, char** argv) {
         printf("%s\n", version_str);
     }
 
-    glfwSwapInterval(1); // TODO: check
+    glfwSwapInterval(0); // TODO: check
 
     // TODO: fix the size
     GLchar shader_info_buffer[200];
@@ -165,11 +165,11 @@ int main(int argc, char** argv) {
 
 
     // init man object array
-    Object man;
+    Object man = { 0 };
     glGenVertexArrays(1, &man.vao);
     man.model_id = man_id;
-    glm_mat4_identity(man.mat);
-    glm_scale_uni(man.mat, 2); /* this is slightly dangerous, be careful to not change scale after startup */
+    man.speed = 5;
+    man.scale = 2;
 
     glBindVertexArray(man.vao);
     {
@@ -192,10 +192,10 @@ int main(int argc, char** argv) {
 
 
     // init plane object array
-    Object plane;
+    Object plane = { 0 };
     glGenVertexArrays(1, &plane.vao);
     plane.model_id = plane_id;
-    glm_mat4_identity(plane.mat);
+    plane.scale = 1;
 
     glBindVertexArray(plane.vao);
     {
@@ -225,11 +225,40 @@ int main(int argc, char** argv) {
     float delta_time = glfwGetTime();
     float last_time = glfwGetTime();
 
-    while (!glfwWindowShouldClose(window)) {
-        POLL_GL_ERROR;
+    double lastTime = glfwGetTime();
+    int nbFrames = 0;
 
+    while (!glfwWindowShouldClose(window)) {
         delta_time = glfwGetTime() - last_time;
         last_time += delta_time;
+
+        // Measure FPS
+        double currentTime = glfwGetTime();
+        nbFrames++;
+        if (currentTime - lastTime >= 1.0) { // If last prinf() was more than 1 sec ago
+            // printf and reset timer
+            printf("%f ms/frame (%f FPS)\n", 1000.0 / double(nbFrames), double(nbFrames));
+            nbFrames = 0;
+            lastTime += 1.0;
+        }
+
+        /* input handling */
+        vec3 dir = { 0 };
+        if (glfwGetKey(window, GLFW_KEY_W)) {
+            dir[2] = -man.speed;
+        }
+        if (glfwGetKey(window, GLFW_KEY_A)) {
+            dir[0] = -man.speed;
+        }
+        if (glfwGetKey(window, GLFW_KEY_S)) {
+            dir[2] = man.speed;
+        }
+        if (glfwGetKey(window, GLFW_KEY_D)) {
+            dir[0] = man.speed;
+        }
+        glm_vec3_scale(dir, delta_time, dir);
+        glm_vec3_add(man.pos, dir, man.pos);
+
 
         float ratio;
         int width, height;
@@ -263,14 +292,13 @@ int main(int argc, char** argv) {
         glUniformMatrix4fv(glGetUniformLocation(program, "view_proj"), 1, GL_FALSE, (const GLfloat*)view_proj);
 
         // draw man
-        vec3 man_pos = { 0, 0, 2 };
-        obj_translate(man, man_pos);
         draw_model(program, man);
 
         // draw plane
         draw_model_force_rgb(program, plane, 1, 0.7, 0.5);
 
         glfwSwapBuffers(window);
+        POLL_GL_ERROR;
         glfwPollEvents();
     }
 

@@ -135,3 +135,34 @@ void draw_model_force_rgb(int program, Object obj, float r, float g, float b)
     glUniform3fv(glGetUniformLocation(program, "forcedColor"), 1, color);
     draw_model_impl(program, obj, true);
 }
+
+Object create_object(int model_id, float x, float y, float z, float speed, float scale, float shininess) {
+    Object obj = { 0 };
+    glGenVertexArrays(1, &obj.vao);
+    obj.pos[0] = x;
+    obj.pos[1] = y;
+    obj.pos[2] = z;
+    obj.model_id = model_id;
+    obj.speed = speed;
+    obj.scale = scale;
+    obj.shininess = shininess;
+
+    glBindVertexArray(obj.vao);
+        // NOTE: OpenGL error checks have been omitted for brevity
+        GLuint vbo1, vbo2;
+        glGenBuffers(1, &vbo1);
+        glGenBuffers(1, &vbo2);
+
+        glBindBuffer(GL_ARRAY_BUFFER, vbo1);
+        glBufferData(GL_ARRAY_BUFFER, loaded_models[obj.model_id].num_faces * 3 * sizeof(vec3), loaded_models[obj.model_id].vertices, GL_STATIC_DRAW);
+        glEnableVertexAttribArray(0);
+        glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, sizeof(float) * 3, (void*)0);
+
+        glBindBuffer(GL_ARRAY_BUFFER, vbo2);
+        glBufferData(GL_ARRAY_BUFFER, loaded_models[obj.model_id].num_faces * 3 * sizeof(vec3), loaded_models[obj.model_id].normals, GL_STATIC_DRAW);
+        glEnableVertexAttribArray(1);
+        glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, sizeof(float) * 3, (void*)0);
+    glBindVertexArray(0);
+
+    return obj;
+}

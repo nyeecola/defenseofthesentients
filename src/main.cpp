@@ -164,62 +164,11 @@ int main(int argc, char** argv) {
     int plane_id = loadModel("assets/plane.obj", NULL, VERTEX_TEXTURE, 1024);
 
 
-    // init man object array
-    Object man = { 0 };
-    glGenVertexArrays(1, &man.vao);
-    man.model_id = man_id;
-    man.speed = 5;
-    man.scale = 2;
-    man.shininess = 2;
+    // create player object
+    Object man = create_object(man_id, 0, 0, 0, 5, 2, 2);
 
-    glBindVertexArray(man.vao);
-    {
-        // NOTE: OpenGL error checks have been omitted for brevity
-        GLuint vbo1, vbo2;
-        glGenBuffers(1, &vbo1);
-        glGenBuffers(1, &vbo2);
-
-        glBindBuffer(GL_ARRAY_BUFFER, vbo1);
-        glBufferData(GL_ARRAY_BUFFER, loaded_models[man.model_id].num_faces * 3 * sizeof(vec3), loaded_models[man.model_id].vertices, GL_STREAM_DRAW);
-        glEnableVertexAttribArray(0);
-        glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, sizeof(float) * 3, (void*)0);
-
-        glBindBuffer(GL_ARRAY_BUFFER, vbo2);
-        glBufferData(GL_ARRAY_BUFFER, loaded_models[man.model_id].num_faces * 3 * sizeof(vec3), loaded_models[man.model_id].normals, GL_STREAM_DRAW);
-        glEnableVertexAttribArray(1);
-        glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, sizeof(float) * 3, (void*)0);
-    }
-    glBindVertexArray(0);
-
-
-    // init plane object array
-    Object plane = { 0 };
-    glGenVertexArrays(1, &plane.vao);
-    plane.model_id = plane_id;
-    plane.scale = 1;
-    plane.shininess = 256;
-
-    glBindVertexArray(plane.vao);
-    {
-        GLuint vbo1, vbo2;
-        glGenBuffers(1, &vbo1);
-        glGenBuffers(1, &vbo2);
-
-        // NOTE: OpenGL error checks have been omitted for brevity
-        glBindBuffer(GL_ARRAY_BUFFER, vbo1);
-        glBufferData(GL_ARRAY_BUFFER, loaded_models[plane.model_id].num_faces * 3 * sizeof(vec3), loaded_models[plane.model_id].vertices, GL_STREAM_DRAW);
-        glEnableVertexAttribArray(0);
-        glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, sizeof(float) * 3, (void*)0);
-
-        glBindBuffer(GL_ARRAY_BUFFER, vbo2);
-        glBufferData(GL_ARRAY_BUFFER, loaded_models[plane.model_id].num_faces * 3 * sizeof(vec3), loaded_models[plane.model_id].normals, GL_STREAM_DRAW);
-        glEnableVertexAttribArray(1);
-        glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, sizeof(float) * 3, (void*)0);
-    }
-    glBindVertexArray(0);
-
-
-    POLL_GL_ERROR;
+    // create placeholder ground object
+    Object plane = create_object(plane_id, 0, 0, 0, 0, 1, 256);
 
     vec3 camera_pos = { 0, 30, 0 };
     vec3 camera_up = { 0, 0, -1 };
@@ -227,20 +176,21 @@ int main(int argc, char** argv) {
     float delta_time = glfwGetTime();
     float last_time = glfwGetTime();
 
-    double lastTime = glfwGetTime();
-    int nbFrames = 0;
+    float last_fps_update = glfwGetTime();
+    int num_frames = 0;
 
+    POLL_GL_ERROR;
     while (!glfwWindowShouldClose(window)) {
         delta_time = glfwGetTime() - last_time;
         last_time += delta_time;
 
         // Measure FPS
         double currentTime = glfwGetTime();
-        nbFrames++;
-        if (currentTime - lastTime >= 1.0) {
-            printf("%f ms/frame (%f FPS)\n", 1000.0 / double(nbFrames), double(nbFrames));
-            nbFrames = 0;
-            lastTime += 1.0;
+        num_frames++;
+        if (currentTime - last_fps_update >= 1.0) {
+            printf("%f ms/frame (%f FPS)\n", 1000.0 / double(num_frames), double(num_frames));
+            num_frames = 0;
+            last_fps_update += 1.0;
         }
 
         /* input handling */

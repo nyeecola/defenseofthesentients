@@ -170,6 +170,7 @@ int main(int argc, char** argv) {
     man.model_id = man_id;
     man.speed = 5;
     man.scale = 2;
+    man.shininess = 2;
 
     glBindVertexArray(man.vao);
     {
@@ -196,6 +197,7 @@ int main(int argc, char** argv) {
     glGenVertexArrays(1, &plane.vao);
     plane.model_id = plane_id;
     plane.scale = 1;
+    plane.shininess = 256;
 
     glBindVertexArray(plane.vao);
     {
@@ -235,8 +237,7 @@ int main(int argc, char** argv) {
         // Measure FPS
         double currentTime = glfwGetTime();
         nbFrames++;
-        if (currentTime - lastTime >= 1.0) { // If last prinf() was more than 1 sec ago
-            // printf and reset timer
+        if (currentTime - lastTime >= 1.0) {
             printf("%f ms/frame (%f FPS)\n", 1000.0 / double(nbFrames), double(nbFrames));
             nbFrames = 0;
             lastTime += 1.0;
@@ -295,7 +296,7 @@ int main(int argc, char** argv) {
         draw_model(program, man);
 
         // draw plane
-        draw_model_force_rgb(program, plane, 1, 0.7, 0.5);
+        draw_model_force_rgb(program, plane, 0.8, 0.7, 0.7);
 
         glfwSwapBuffers(window);
         POLL_GL_ERROR;

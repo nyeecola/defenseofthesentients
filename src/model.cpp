@@ -117,6 +117,7 @@ void draw_model_impl(int program, Object obj, bool force_color)
     glm_translate(mat, obj.pos);
     glUniform1i(glGetUniformLocation(program, "forceColor"), force_color);
     glUniform1i(glGetUniformLocation(program, "hasTexture"), loaded_models[obj.model_id].has_texture);
+    glUniform1i(glGetUniformLocation(program, "shininess"), obj.shininess);
     glUniformMatrix4fv(glGetUniformLocation(program, "model"), 1, GL_FALSE, (const GLfloat*)mat);
     glBindVertexArray(obj.vao);
     glDrawArrays(GL_TRIANGLES, 0, 3 * loaded_models[obj.model_id].num_faces);

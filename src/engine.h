@@ -26,6 +26,7 @@ struct Model {
 typedef struct {
     int model_id; /* loaded_models[] */
     GLuint vao; /* vertex attrib obj */
+    int shininess; /* 2-256 */
 
     float scale;
     vec3 pos;

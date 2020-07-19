@@ -30,6 +30,7 @@ typedef struct {
 
     float scale;
     vec3 pos;
+    vec2 dir; /* TODO: do we need vec3 here? */
     float speed; /* maybe separate this field in another struct */
 } Object;
 

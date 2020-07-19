@@ -32,7 +32,6 @@ void main() {
     float diffuseTmp = max(dot(norm, lightDir), 0.0);
     vec3 diffuseContrib = diffuseTmp * lightColor;
 
-    // TODO: test specular highlight
     float specularTmp = 0.5;
     vec3 cameraDir = normalize(cameraPos - fragPos);
     vec3 reflectDir = reflect(-lightDir, norm); 

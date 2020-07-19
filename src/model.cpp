@@ -114,6 +114,9 @@ void draw_model_impl(int program, Object obj, bool force_color)
     mat4 mat;
     glm_mat4_identity(mat);
     glm_translate(mat, obj.pos);
+    double rad = atan2(-obj.dir[1], obj.dir[0]);
+    vec3 axis = { 0, 1, 0 };
+    glm_rotate(mat, rad, axis);
     glm_scale_uni(mat, obj.scale);
     glUniform1i(glGetUniformLocation(program, "forceColor"), force_color);
     glUniform1i(glGetUniformLocation(program, "hasTexture"), loaded_models[obj.model_id].has_texture);

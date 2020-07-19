@@ -194,6 +194,16 @@ int main(int argc, char** argv) {
             last_fps_update += 1.0;
         }
 
+        /* handle screen resize */
+        // TODO: don't do this every frame, only when it changes!!
+        float ratio;
+        int width, height;
+        glfwGetFramebufferSize(window, &width, &height);
+        ratio = width / (float)height;
+        mat4 proj_mat;
+        glm_perspective(GLM_PI_4f, ratio, 0.01f, 300.0f, proj_mat);
+
+
         /* input handling */
         vec3 dir = { 0 };
         if (glfwGetKey(window, GLFW_KEY_W)) {
@@ -213,13 +223,19 @@ int main(int argc, char** argv) {
         glm_vec3_add(man.pos, dir, man.pos);
         glm_vec3_add(camera_pos, dir, camera_pos);
 
+        double xpos, ypos;
+        glfwGetCursorPos(window, &xpos, &ypos);
+        xpos /= width / 2;
+        ypos /= height / 2;
+        xpos -= 1;
+        ypos -= 1;
+        xpos *= ratio;
+        //printf("%lf %lf\n", xpos, ypos);
 
-        float ratio;
-        int width, height;
-        glfwGetFramebufferSize(window, &width, &height);
-        ratio = width / (float)height;
-        mat4 proj_mat;
-        glm_perspective(GLM_PI_4f, ratio, 0.01f, 300.0f, proj_mat);
+        /* update player direction */
+        man.dir[0] = xpos;
+        man.dir[1] = ypos;
+        glm_vec2_normalize(man.dir);
 
 
         mat4 view_mat;

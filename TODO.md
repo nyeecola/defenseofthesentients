@@ -8,7 +8,6 @@ TO DOs:
 - Dumb straight path enemies
 - Shooting mechanics
 - Waves
-- Camera movement
 - Animation
 - Smart pathfinding for enemies
 - Map editor mode

@@ -36,22 +36,8 @@ static void key_callback(GLFWwindow* window, int key, int scancode, int action, 
         glfwSetWindowShouldClose(window, GLFW_TRUE);
     }
 
-    if (glfwGetKey(window, GLFW_KEY_C) == GLFW_PRESS) {
-        if (selected != -1) {
-            selected = -1;
-            camera_enabled = true;
-        }
-        else {
-            camera_enabled = !camera_enabled;
-        }
-    }
-
-    for (int i = 0; i <= 9; i++) {
-        int state = glfwGetKey(window, GLFW_KEY_0 + i);
-        if (state == GLFW_PRESS) {
-            selected = i;
-            camera_enabled = false;
-        }
+    if (key == GLFW_KEY_B && action == GLFW_PRESS) {
+        grid_enabled = !grid_enabled;
     }
 }
 
@@ -229,6 +215,8 @@ int main(int argc, char** argv) {
         ypos /= height / 2;
         xpos -= 1;
         ypos -= 1;
+        double nds_x = xpos;
+        double nds_y = -ypos;
         xpos *= ratio;
         //printf("%lf %lf\n", xpos, ypos);
 
@@ -268,7 +256,23 @@ int main(int argc, char** argv) {
         draw_model(program, man2);
 
         // draw plane
+        glUniform1i(glGetUniformLocation(program, "gridEnabled"), grid_enabled);
+        // TODO: deal with this
+        vec4 ray_clip = { nds_x, nds_y, -1, 1 };
+        mat4 proj_mat_inv;
+        glm_mat4_inv(proj_mat, proj_mat_inv);
+        glm_mat4_mulv(proj_mat_inv, ray_clip, ray_clip);
+        vec4 ray_eye = { ray_clip[0], ray_clip[1], -1, 0 };
+        mat4 view_mat_inv;
+        glm_mat4_inv(view_mat, view_mat_inv);
+        glm_mat4_mulv(view_mat_inv, ray_eye, ray_eye);
+        vec3 ray_world = { ray_eye[0], ray_eye[1], ray_eye[2] };
+        glm_vec3_normalize(ray_world);
+        float t = -camera_pos[1] / ray_world[1];
+        vec3 target_pos = { camera_pos[0] + t * ray_world[0], 0, camera_pos[2] + t * ray_world[2] };
+        glUniform3fv(glGetUniformLocation(program, "cursorPos"), 1, target_pos);
         draw_model_force_rgb(program, plane, 0.8, 0.7, 0.7);
+        glUniform1i(glGetUniformLocation(program, "gridEnabled"), 0);
 
         glfwSwapBuffers(window);
         POLL_GL_ERROR;

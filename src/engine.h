@@ -34,7 +34,6 @@ typedef struct {
     float speed; /* maybe separate this field in another struct */
 } Object;
 
-
 /* Util */
 
 struct File {

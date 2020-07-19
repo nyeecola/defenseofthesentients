@@ -157,7 +157,7 @@ int main(int argc, char** argv) {
     Object plane = create_object(plane_id, 0, 0, 0, 0, 1, 256);
 
     // initialize camera data
-    vec3 camera_pos = { 0, 35, 0 };
+    vec3 camera_pos = { 0, 35, 12 };
     vec3 camera_up = { 0, 0, -1 }; /* TODO: positive or negative? */
 
     float delta_time = glfwGetTime();
@@ -227,7 +227,7 @@ int main(int argc, char** argv) {
 
 
         mat4 view_mat;
-        vec3 camera_target = { camera_pos[0], 0, camera_pos[2] };
+        vec3 camera_target = { man.pos[0], 0, man.pos[2] + 0.2 };
         glm_lookat(camera_pos, camera_target, camera_up, view_mat);
 
         mat4 view_proj;

@@ -1,8 +1,8 @@
 #version 330
 
-#define GRID_CELL_SIZE 5
-#define GRID_LINE_WEIGHT 0.5
-#define GRID_HIGHLIGHT_SIZE 6
+#define GRID_CELL_SIZE 0.8
+#define GRID_LINE_WEIGHT 0.08
+#define GRID_HIGHLIGHT_SIZE 12
 
 #define GRID_CELL_BORDER_COLOR (vec3(40.0, 117.0, 188.0)/255.0)
 
@@ -53,17 +53,12 @@ void main() {
     /* draw grid */
     if (gridEnabled) {
         float dist = length(cursorPos - fragPos);
-        vec3 targetColor = vec3(1.0);//mix(GRID_CELL_BORDER_COLOR, result, smoothstep(0.0, GRID_HIGHLIGHT_SIZE, float(dist)));
+        vec3 targetColor = mix(GRID_CELL_BORDER_COLOR, result, smoothstep(0.0, GRID_HIGHLIGHT_SIZE, float(dist)));
         float x_offset = abs(fragPos.x - round(fragPos.x / GRID_CELL_SIZE) * GRID_CELL_SIZE);
         float z_offset = abs(fragPos.z - round(fragPos.z / GRID_CELL_SIZE) * GRID_CELL_SIZE);
-        result = mix(targetColor, result, smoothstep(0.0, GRID_LINE_WEIGHT, min(x_offset, z_offset)*min(x_offset, z_offset)));
-        /*result = mix(targetColor, result, smoothstep(0.0, GRID_LINE_WEIGHT, abs(fragPos.x - round(fragPos.x / GRID_CELL_SIZE) * GRID_CELL_SIZE)));
-        result = mix(targetColor, result, smoothstep(0.0, GRID_LINE_WEIGHT, abs(fragPos.z - round(fragPos.z / GRID_CELL_SIZE) * GRID_CELL_SIZE)));*/
-        /*if (length(tmpResult1 - targetColor) > length(tmpResult2 - targetColor)) {
-            result = tmpResult2;
-        } else {
-            result = tmpResult1;
-        }*/
+        result = mix(targetColor, result, smoothstep(0.0, GRID_LINE_WEIGHT, abs(fragPos.x - round(fragPos.x / GRID_CELL_SIZE) * GRID_CELL_SIZE)));
+        result = mix(targetColor, result, smoothstep(0.0, GRID_LINE_WEIGHT, abs(fragPos.z - round(fragPos.z / GRID_CELL_SIZE) * GRID_CELL_SIZE)));
+
     }
 
     // TODO: should we cap at 1?

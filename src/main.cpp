@@ -111,7 +111,7 @@ GLuint create_shadow_map_program() {
 }
 
 // TODO: refactor
-void blit_texture(GLuint texture) {
+void blit_texture(GLuint width, GLuint height, GLuint texture) {
     static bool initialized = false;
     static GLuint program;
     static GLuint VAO;
@@ -156,8 +156,8 @@ void blit_texture(GLuint texture) {
     glUniform1i(glGetUniformLocation(program, "tex"), 0);
     POLL_GL_ERROR;
     glDisable(GL_CULL_FACE);
-    glViewport(0, 0, WINDOW_WIDTH, WINDOW_HEIGHT);
     glClearColor(1.0, 0.0, 0.0, 1);
+    glViewport(0, 0, width, height);
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
     glBindVertexArray(VAO);
         glDrawArrays(GL_TRIANGLES, 0, 6);
@@ -488,7 +488,7 @@ int main(int argc, char** argv) {
         shadow_mapping_pass(shadow_map_fbo, shadow_map_tex, man, man2, plane,
                             shadow_map_program, light_pos, camera_up, false);
 
-#if 1
+#if 0
         // render actual scene
         final_render(width, height, nds_x, nds_y, camera_pos,
                      camera_up, light_pos, man, man2, plane,
@@ -496,7 +496,7 @@ int main(int argc, char** argv) {
 #else
         POLL_GL_ERROR;
         // blit shadow map to screen quad
-        blit_texture(shadow_map_tex);
+        blit_texture(width, height, shadow_map_tex);
 #endif
 
         // present

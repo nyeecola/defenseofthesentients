@@ -139,9 +139,10 @@ void draw_model_force_rgb(int program, Object obj, float r, float g, float b)
     draw_model_impl(program, obj, true);
 }
 
-Object create_object(int model_id, float x, float y, float z, float speed, float scale, float shininess) {
-    Object obj = { 0 };
+Object create_object(ObjectType type, int model_id, float x, float y, float z, float speed, float scale, float shininess) {
+    Object obj = {};
     glGenVertexArrays(1, &obj.vao);
+    obj.type = type;
     obj.pos[0] = x;
     obj.pos[1] = y;
     obj.pos[2] = z;

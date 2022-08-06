@@ -107,6 +107,7 @@ void main() {
     float attenuation = 10.0 / (dist * dist);
     
     vec3 result = ((diffuseContrib * (1.0 - is_shadowed(fragPos, norm)) * attenuation) + ambientContrib) * objColor;
+    //vec3 result = objColor;
 
     /*
     // draw grid

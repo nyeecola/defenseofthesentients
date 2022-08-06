@@ -23,7 +23,14 @@ struct Model {
     bool has_texture;
 };
 
+enum ObjectType {
+    OBJ_CHARACTER,
+    OBJ_GROUND
+};
+
 typedef struct {
+    ObjectType type;
+
     int model_id; /* loaded_models[] */
     GLuint vao; /* vertex attrib obj */
     int shininess; /* 2-256 */
@@ -51,4 +58,30 @@ enum LightType {
     DIRECTIONAL,
     POINTLIGHT,
     SPOTLIGHT,
+};
+
+struct Light {
+    LightType type;
+    vec3 pos;
+    vec3 dir; // unused for POINTLIGHTs
+    mat4 shadow_map_matrix; // unused for POINTLIGHTs
+};
+
+enum RenderPass {
+    PASS_SHADOW_MAP,
+    PASS_FINAL
+};
+
+enum CameraType {
+    CAMERA_TARGETED,
+    CAMERA_FREE,
+};
+
+struct Camera {
+    CameraType type;
+    vec3 pos;
+    vec3 up;
+
+    vec3 dir; // CAMERA_FREE
+    vec3 *target; // CAMERA_TARGETED
 };

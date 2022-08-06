@@ -148,6 +148,7 @@ void blit_texture(GLuint width, GLuint height, GLuint texture) {
     }
 
     // TODO: fix this blit texture thing, something is very broken
+    //       maybe this comment is outdated
     glUseProgram(program);
     POLL_GL_ERROR;
     glActiveTexture(GL_TEXTURE0);
@@ -170,21 +171,18 @@ mat4 shadow_map_matrix;
 
 // TODO: put all this state in a struct
 void render_scene(float width, float height, float mouse_x, float mouse_y,
-                  vec3 camera_pos, vec3 camera_up, vec3 light_pos, Object man,
-                  Object man2, Object plane, GLuint program, bool final) {
+                  vec3 camera_pos, vec3 camera_up, vec3 light_pos, mat4 view_mat,
+                  Object man, Object man2, Object plane, GLuint program, bool final) {
     float ratio = width / height;
 
-    mat4 proj_mat;
-    glm_perspective(GLM_PI_4f, ratio, 0.01f, 300.0f, proj_mat);
+    // TODO: move this out
+    float far_plane = 300.0f;
 
-    mat4 view_mat;
-    if (final) {
-        vec3 camera_target = { man.pos[0], 0, man.pos[2] + 0.2 };
-        glm_lookat(camera_pos, camera_target, camera_up, view_mat);
-    } else { // TODO: fix this
-        vec3 camera_target = { 5, 0, 5 };
-        glm_lookat(camera_pos, camera_target, camera_up, view_mat);
-    }
+    mat4 proj_mat;
+    if (final)
+        glm_perspective(GLM_PI_4f, ratio, 0.01f, far_plane, proj_mat);
+    else
+        glm_perspective(GLM_PI_2f, ratio, 0.01f, far_plane, proj_mat);
 
     mat4 view_proj;
     glm_mat4_identity(view_proj);
@@ -205,13 +203,14 @@ void render_scene(float width, float height, float mouse_x, float mouse_y,
     glUseProgram(program);
 
     if (final) {
-        glUniform3fv(glGetUniformLocation(program, "lightPos"), 1, light_pos);
         glUniform1i(glGetUniformLocation(program, "shadowMap"), 0);
         glUniformMatrix4fv(glGetUniformLocation(program, "shadow_map_matrix"), 1, GL_FALSE, (const GLfloat*)shadow_map_matrix);
         glUniform1i(glGetUniformLocation(program, "ditherPattern"), 1);
     } else {
         glm_mat4_copy(view_proj, shadow_map_matrix);
     }
+    glUniform3fv(glGetUniformLocation(program, "lightPos"), 1, light_pos);
+    glUniform1f(glGetUniformLocation(program, "farPlane"), far_plane);
     glUniform3fv(glGetUniformLocation(program, "cameraPos"), 1, camera_pos);
     glUniformMatrix4fv(glGetUniformLocation(program, "view_proj"), 1, GL_FALSE, (const GLfloat*)view_proj);
 
@@ -225,7 +224,7 @@ void render_scene(float width, float height, float mouse_x, float mouse_y,
     if (final) { // we don't care about the grid when doing shadow mapping
         // TODO: refactor
         glUniform1i(glGetUniformLocation(program, "gridEnabled"), grid_enabled);
-        vec4 ray_clip = { mouse_x, mouse_y, -1, 1 };
+        vec4 ray_clip = {mouse_x, mouse_y, -1, 1};
         mat4 proj_mat_inv;
         glm_mat4_inv(proj_mat, proj_mat_inv);
         glm_mat4_mulv(proj_mat_inv, ray_clip, ray_clip);
@@ -243,63 +242,125 @@ void render_scene(float width, float height, float mouse_x, float mouse_y,
     glUniform1i(glGetUniformLocation(program, "gridEnabled"), 0);
 }
 
-void initialize_shadow_map_fbo(GLuint *fbo, GLuint *tex) {
-    // TODO: move constants out
-    int width = 4096;
-    int height = 4096;
-
+void initialize_shadow_map_fbo(GLuint *fbo, GLuint *tex, LightType light_type) {
     // TODO: remember to free resources
     glGenFramebuffers(1, fbo);
     glGenTextures(1, tex);
 
-    glBindTexture(GL_TEXTURE_2D, *tex);
-        glTexImage2D(GL_TEXTURE_2D, 0, GL_DEPTH_COMPONENT, width, height, 0, GL_DEPTH_COMPONENT, GL_FLOAT, NULL);
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST); // TODO: why not linear?
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_BORDER);
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_BORDER);
+    GLuint tex_type = light_type == POINTLIGHT ? GL_TEXTURE_CUBE_MAP : GL_TEXTURE_2D;
+
+    glBindTexture(tex_type, *tex);
+        if (light_type == POINTLIGHT) {
+            for (int i = 0; i < 6; i++) {
+                glTexImage2D(GL_TEXTURE_CUBE_MAP_POSITIVE_X + i, 0, GL_DEPTH_COMPONENT,
+                             SHADOW_MAP_RESOLUTION, SHADOW_MAP_RESOLUTION, 0,
+                             GL_DEPTH_COMPONENT, GL_FLOAT, NULL);
+            }
+        } else {
+            glTexImage2D(tex_type, 0, GL_DEPTH_COMPONENT, SHADOW_MAP_RESOLUTION,
+                         SHADOW_MAP_RESOLUTION, 0, GL_DEPTH_COMPONENT, GL_FLOAT, NULL);
+        }
+        
+        glTexParameteri(tex_type, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+        glTexParameteri(tex_type, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+        glTexParameteri(tex_type, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_BORDER);
+        glTexParameteri(tex_type, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_BORDER);
+        if (light_type == POINTLIGHT)
+            glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_R, GL_CLAMP_TO_BORDER);
+
+        // This border color is needed to remove artifacts at the edge of the light's
+        // view frustrum.
         vec4 border_color = { 1.0f, 1.0f, 1.0f, 1.0f };
-        glTexParameterfv(GL_TEXTURE_2D, GL_TEXTURE_BORDER_COLOR, border_color);
-    glBindTexture(GL_TEXTURE_2D, 0);
+        glTexParameterfv(tex_type, GL_TEXTURE_BORDER_COLOR, border_color);
+    glBindTexture(tex_type, 0);
 
     glBindFramebuffer(GL_FRAMEBUFFER, *fbo);
-        glFramebufferTexture2D(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_TEXTURE_2D, *tex, 0);
-
-        // disable color rendering
-        glDrawBuffer(GL_NONE);
-        glReadBuffer(GL_NONE);
+    // we only need the depth buffer
+    glDrawBuffer(GL_NONE);
+    glReadBuffer(GL_NONE);
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
 }
 
 void shadow_mapping_pass(GLuint fbo, GLuint tex, Object man, Object man2, Object plane,
-                         GLuint program, vec3 light_pos, vec3 camera_up, bool final) {
-    // TODO: move constants out
-    int width = 4096;
-    int height = 4096;
+                         GLuint program, vec3 light_pos, vec3 camera_up, LightType light_type)
+{
+    
+    mat4 view_mat;
 
-    // render scene from light POV
     glBindFramebuffer(GL_FRAMEBUFFER, fbo);
-        render_scene(width, height, 0, 0, light_pos, camera_up,
-                     light_pos, man, man2, plane, program, final);
+    switch (light_type) {
+    case SPOTLIGHT:
+    case DIRECTIONAL: {
+        vec3 camera_target = { 5, 0, 5 };
+        glm_lookat(light_pos, camera_target, camera_up, view_mat);
+        glFramebufferTexture2D(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_TEXTURE_2D, tex, 0);
+        render_scene(SHADOW_MAP_RESOLUTION, SHADOW_MAP_RESOLUTION,
+                     0, 0, light_pos, camera_up, light_pos, view_mat,
+                     man, man2, plane, program, false);
+        break;
+    }
+    case POINTLIGHT: {
+        vec3 directions[6] = {
+            {1.0f, 0.0f, 0.0f},
+            {-1.0f, 0.0f, 0.0f},
+            {0.0f, 1.0f, 0.0f},
+            {0.0f, -1.0f, 0.0f},
+            {0.0f, 0.0f, 1.0f},
+            {0.0f, 0.0f, -1.0f},
+        };
+        vec3 up[6] = {
+            {0.0f, -1.0f, 0.0f},
+            {0.0f, -1.0f, 0.0f},
+            {0.0f, 0.0f, 1.0f},
+            {0.0f, 0.0f, -1.0f},
+            {0.0f, -1.0f, 0.0f},
+            {0.0f, -1.0f, 0.0f},
+        };
+
+        for (int i = 0; i < 6; i++) {
+            vec3 camera_target;
+            glm_vec3_add(light_pos, directions[i], camera_target);
+            glm_lookat(light_pos, camera_target, up[i], view_mat);
+            glFramebufferTexture2D(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT,
+                                   GL_TEXTURE_CUBE_MAP_POSITIVE_X + i, tex, 0);
+            render_scene(SHADOW_MAP_RESOLUTION, SHADOW_MAP_RESOLUTION,
+                         0, 0, light_pos, camera_up, light_pos, view_mat,
+                         man, man2, plane, program, false);
+        }
+        break;
+    }
+    default:
+        assert(false && "UNKNOWN LIGHT TYPE!");
+        break;
+    }
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
 }
 
 void final_render(float width, float height, float mouse_x, float mouse_y,
-                  vec3 camera_pos, vec3 camera_up, vec3 light_pos, Object man,
-                  Object man2, Object plane, GLuint program, GLuint shadow_map_tex,
-                  GLuint dither_tex, bool final) {
+                  vec3 camera_pos, vec3 camera_up, vec3 light_pos,
+                  LightType light_type, Object man, Object man2, Object plane,
+                  GLuint program, GLuint shadow_map_tex, GLuint dither_tex)
+{
+    GLuint tex_type = light_type == POINTLIGHT ? GL_TEXTURE_CUBE_MAP : GL_TEXTURE_2D;
+
     glActiveTexture(GL_TEXTURE0);
-    glBindTexture(GL_TEXTURE_2D, shadow_map_tex);
+    glBindTexture(tex_type, shadow_map_tex);
     glActiveTexture(GL_TEXTURE1);
     glBindTexture(GL_TEXTURE_2D, dither_tex);
-    POLL_GL_ERROR;
+
+    mat4 view_mat;
+    vec3 camera_target = { man.pos[0], 0, man.pos[2] + 0.2 };
+    glm_lookat(camera_pos, camera_target, camera_up, view_mat);
+
     render_scene(width, height, mouse_x, mouse_y, camera_pos,
-                 camera_up, light_pos, man, man2, plane, program, final);
-    POLL_GL_ERROR;
+                 camera_up, light_pos, view_mat,
+                 man, man2, plane, program, true);
+
     glBindTexture(GL_TEXTURE_2D, 0);
 }
 
-int main(int argc, char** argv) {
+int main(int argc, char** argv)
+{
     GLFWwindow* window;
     GLuint vertex_shader, fragment_shader, program;
     GLint mvp_location, model_mat_location;
@@ -393,7 +454,7 @@ int main(int argc, char** argv) {
     vec3 camera_up = { 0, 0, -1 }; // TODO: positive or negative?
 
     // initialize light data
-    vec3 light_pos = { 0, 5, 0 };
+    vec3 light_pos = { 0, 5.0, 0 };
 
     float delta_time = glfwGetTime();
     float last_time = glfwGetTime();
@@ -401,7 +462,7 @@ int main(int argc, char** argv) {
     POLL_GL_ERROR;
 
     GLuint shadow_map_fbo, shadow_map_tex;
-    initialize_shadow_map_fbo(&shadow_map_fbo, &shadow_map_tex);
+    initialize_shadow_map_fbo(&shadow_map_fbo, &shadow_map_tex, POINTLIGHT);
     GLuint shadow_map_program = create_shadow_map_program();
 
     const GLchar dither_pattern[] = {
@@ -486,13 +547,13 @@ int main(int argc, char** argv) {
         POLL_GL_ERROR;
         // shadow mapping
         shadow_mapping_pass(shadow_map_fbo, shadow_map_tex, man, man2, plane,
-                            shadow_map_program, light_pos, camera_up, false);
+                            shadow_map_program, light_pos, camera_up, POINTLIGHT);
 
-#if 0
+#if 1
         // render actual scene
         final_render(width, height, nds_x, nds_y, camera_pos,
-                     camera_up, light_pos, man, man2, plane,
-                     program, shadow_map_tex, dither_tex, true);
+                     camera_up, light_pos, POINTLIGHT, man, man2,
+                     plane, program, shadow_map_tex, dither_tex);
 #else
         POLL_GL_ERROR;
         // blit shadow map to screen quad

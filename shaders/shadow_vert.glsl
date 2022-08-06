@@ -6,6 +6,9 @@ uniform mat4 view_proj;
 
 layout (location = 0) in vec3 vPos;
 
+out vec4 fragPos;
+
 void main() {
-    gl_Position = view_proj * model * vec4(vPos, 1.0);
+    fragPos = model * vec4(vPos, 1.0);
+    gl_Position = view_proj * fragPos;
 }

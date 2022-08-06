@@ -18,13 +18,18 @@ uniform vec3 cursorPos;
 
 uniform int shininess;
 
-uniform sampler2D shadowMap;
+uniform samplerCube shadowMap;
+uniform float farPlane;
+
 uniform sampler2D ditherPattern;
 
 smooth in vec3 normal;
 smooth in vec3 fragPos;
-smooth in vec4 fragPosFromLight;
 
+// TODO: separate shader for non-point light sources
+//uniform sampler2D shadowMap;
+//smooth in vec4 fragPosFromLight;
+/*
 float is_shadowed(vec4 pos_from_light) {
     // perspective divide (not done automatically because it's not gl_Position)
     vec3 pos = pos_from_light.xyz / pos_from_light.w;
@@ -41,6 +46,20 @@ float is_shadowed(vec4 pos_from_light) {
 
     //return 0.7;
     return pos.z > occluder ? 1.0 : 0.0;
+}*/
+
+float is_shadowed(vec3 pos, vec3 normal) {
+    vec3 pos_from_light = pos - lightPos; // 0, -3.5, 0
+
+    // get first occluder from light's POV
+    float occluder = texture(shadowMap, pos_from_light.xyz).r; // [0, 1], o mais escuro possivel
+
+    // transform occluder from [0,1] to [0,farPlane]
+    occluder *= farPlane;
+
+    float bias = max(0.05 * (1.0 - dot(normal, normalize(lightPos - pos))), 0.0005);  
+    
+    return (length(pos_from_light) - bias > occluder) ? 1.0 : 0.0;
 }
 
 vec3 dither(vec3 og_color)  {
@@ -66,7 +85,7 @@ void main() {
 
     vec3 norm = normalize(normal);
     vec3 lightDir = normalize(lightPos - fragPos);
-    float distance = length(lightPos - fragPos);
+    float dist = length(lightPos - fragPos);
 
     // ambient
     vec3 ambientContrib = 0.005 * lightColor;
@@ -84,9 +103,10 @@ void main() {
     vec3 specularContrib = specularTmp * lightColor;
     */
 
-    float attenuation = 1.0 / (distance * distance);
+    // TODO: play with attenuation values
+    float attenuation = 10.0 / (dist * dist);
     
-    vec3 result = ((diffuseContrib * (1.0 - is_shadowed(fragPosFromLight)) * attenuation) + ambientContrib) * objColor;
+    vec3 result = ((diffuseContrib * (1.0 - is_shadowed(fragPos, norm)) * attenuation) + ambientContrib) * objColor;
 
     /*
     // draw grid
@@ -105,5 +125,4 @@ void main() {
 
     // TODO: should we cap at 1?
     gl_FragColor = vec4(dither(result), 1.0);
-    //gl_FragColor = vec4(result, 1.0);
 }

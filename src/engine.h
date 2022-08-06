@@ -46,3 +46,9 @@ struct File {
     vec2* texture_coords;
     int num_texture_coords;
 };
+
+enum LightType {
+    DIRECTIONAL,
+    POINTLIGHT,
+    SPOTLIGHT,
+};

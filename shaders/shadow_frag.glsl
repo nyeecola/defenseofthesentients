@@ -1,5 +1,10 @@
 #version 330
 
+uniform vec3 lightPos;
+uniform float farPlane;
+
+in vec4 fragPos;
+
 void main() {
-	// we don't need to do anything, the depth buffer will be written by default, and we don't have a color buffer
+	gl_FragDepth = length(fragPos.xyz - lightPos) / farPlane;
 }

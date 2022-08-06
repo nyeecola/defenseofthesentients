@@ -8,7 +8,7 @@ void destroyModel(int model) {
     }
 }
 
-int loadModel(const char* obj_filename, const char* texture_filename, FaceType face_type, int texture_size) {
+int loadModel(const char* obj_filename, const char* texture_filename, FaceType face_type, int texture_size, bool calculate_tangents) {
     File file = {0};
 
     file.vertices = (vec3*) malloc(MAX_OBJ_SIZE * sizeof(vec3));
@@ -78,6 +78,11 @@ int loadModel(const char* obj_filename, const char* texture_filename, FaceType f
     model->normals = (vec3*) malloc(model->num_faces * 3 * sizeof(vec3));
     model->texture_coords = (vec2*) malloc(model->num_faces * 3 * sizeof(vec2));
 
+    if (calculate_tangents) {
+        model->tangents = (vec3*)malloc(model->num_faces * 3 * sizeof(vec3));
+        model->bitangents = (vec3*)malloc(model->num_faces * 3 * sizeof(vec3));
+    }
+
     int k = 0;
     for (int i = 0; i < file.num_faces; i++) {
         for (int j = 0; j < 3; j++) {
@@ -97,6 +102,49 @@ int loadModel(const char* obj_filename, const char* texture_filename, FaceType f
             model->texture_coords[k + 1][j] = file.texture_coords[file.faces[i].texture_coords[1]][j];
             model->texture_coords[k + 2][j] = file.texture_coords[file.faces[i].texture_coords[2]][j];
         }
+
+        // calculate tangents and bitangents if requested (outside this loop, when we have all vertex information loaded)
+        if (calculate_tangents) {
+            int j;
+
+            j = 0;
+
+            // face vertices
+            vec3 A = { model->vertices[k][0], model->vertices[k][1], model->vertices[k][2] };
+            vec3 B = { model->vertices[k+1][0], model->vertices[k+1][1], model->vertices[k+1][2] };
+            vec3 C = { model->vertices[k+2][0], model->vertices[k+2][1], model->vertices[k+2][2] };
+
+            // face UB
+            vec3 UV_A = { model->texture_coords[k][0], model->texture_coords[k][1], model->texture_coords[k][2] };
+            vec3 UV_B = { model->texture_coords[k+1][0], model->texture_coords[k+1][1], model->texture_coords[k+1][2] };
+            vec3 UV_C = { model->texture_coords[k+2][0], model->texture_coords[k+2][1], model->texture_coords[k+2][2] };
+
+            vec3 AB, AC;
+            glm_vec3_sub(B, A, AB);
+            glm_vec3_sub(C, A, AC);
+
+            vec2 deltaUV_AB, deltaUV_AC;
+            glm_vec2_sub(UV_B, UV_A, deltaUV_AB);
+            glm_vec2_sub(UV_C, UV_A, deltaUV_AC);
+
+            float fract = 1.0f / (deltaUV_AB[0] * deltaUV_AC[1] - deltaUV_AC[0] * deltaUV_AB[1]);
+
+            model->tangents[k][0] = fract * (deltaUV_AC[1] * AB[0] - deltaUV_AB[1] * AC[0]);
+            model->tangents[k][1] = fract * (deltaUV_AC[1] * AB[1] - deltaUV_AB[1] * AC[1]);
+            model->tangents[k][2] = fract * (deltaUV_AC[1] * AB[2] - deltaUV_AB[1] * AC[2]);
+
+            model->bitangents[k][0] = fract * (-deltaUV_AC[0] * AB[0] + deltaUV_AB[0] * AC[0]);
+            model->bitangents[k][1] = fract * (-deltaUV_AC[0] * AB[1] + deltaUV_AB[0] * AC[1]);
+            model->bitangents[k][2] = fract * (-deltaUV_AC[0] * AB[2] + deltaUV_AB[0] * AC[2]);
+
+			// TODO: smoothen bitangents and tangents by averaging them for each vector
+            model->tangents[k + 1][0] = model->tangents[k + 2][0] = model->tangents[k][0];
+            model->tangents[k + 1][1] = model->tangents[k + 2][1] = model->tangents[k][1];
+            model->tangents[k + 1][2] = model->tangents[k + 2][2] = model->tangents[k][2];
+            model->bitangents[k + 1][0] = model->bitangents[k + 2][0] = model->bitangents[k][0];
+            model->bitangents[k + 1][1] = model->bitangents[k + 2][1] = model->bitangents[k][1];
+            model->bitangents[k + 1][2] = model->bitangents[k + 2][2] = model->bitangents[k][2];
+		}
 
         k += 3;
     }

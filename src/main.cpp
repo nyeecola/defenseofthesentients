@@ -470,10 +470,10 @@ int main(int argc, char** argv)
     }
 
     // load models
-    int monkey_id = loadModel("assets/monkey.obj", NULL, VERTEX_TEXTURE, 1024);
-    int man_id = loadModel("assets/man.obj", NULL, VERTEX_TEXTURE, 1024);
-    //int man_id = loadModel("assets/xbot.fbx", NULL, VERTEX_TEXTURE, 1024);
-    int plane_id = loadModel("assets/plane.obj", NULL, VERTEX_TEXTURE, 1024);
+    int monkey_id = loadModel("assets/monkey.obj", NULL, VERTEX_TEXTURE, 1024, false);
+    int man_id = loadModel("assets/man.obj", NULL, VERTEX_TEXTURE, 1024, false);
+    //int man_id = loadModel("assets/xbot.fbx", NULL, VERTEX_TEXTURE, 1024, false);
+    int plane_id = loadModel("assets/plane.obj", NULL, VERTEX_TEXTURE, 1024, true);
 
     // initialize scene geometry
 	Object man = create_object(OBJ_CHARACTER, man_id, 0, 0, 0, 5, 2, 2);

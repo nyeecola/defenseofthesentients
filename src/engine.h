@@ -21,6 +21,10 @@ struct Model {
     vec2* texture_coords;
     int num_faces;
     bool has_texture;
+
+    // Note: currently only generated for the ground
+    vec3* tangents;
+    vec3* bitangents;
 };
 
 enum ObjectType {

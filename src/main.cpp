@@ -75,6 +75,7 @@ char* load_file(char const* path) {
 }
 
 GLuint compile_shader(GLuint stage, char *filename) {
+    // TODO: free
     char* vertex_shader_text = load_file(filename);
 
     GLuint shader = glCreateShader(stage);
@@ -313,9 +314,6 @@ void render_scene(float width, float height, float mouse_x, float mouse_y,
         vec3 target_pos;
         ray_plane_intersection(ray_origin, ray_dir, plane_normal,
             light->pos[1], target_pos);
-        fprintf(stderr, "%f %f %f -> %f %f %f\n",
-            target_pos[0], target_pos[1], target_pos[2],
-            light->pos[0], light->pos[2], light->pos[3]);
         if (glm_vec3_norm(target_pos) > 0.95f)
             glm_vec3_copy(target_pos, light->pos);
     }
@@ -501,39 +499,11 @@ int main(int argc, char** argv)
     GLchar shader_info_buffer[200];
     GLint shader_info_len;
 
-    // TODO: free
-    char* vertex_shader_text = load_file("shaders/vert.glsl");
-    char* fragment_shader_text = load_file("shaders/frag.glsl");
-
-    // default vertex shader
-    {
-        vertex_shader = glCreateShader(GL_VERTEX_SHADER);
-        glShaderSource(vertex_shader, 1, (const char* const*)&vertex_shader_text, NULL);
-        glCompileShader(vertex_shader);
-
-        glGetShaderInfoLog(vertex_shader, 200, &shader_info_len, shader_info_buffer);
-        if (shader_info_len) printf("Vertex Shader: %s\n", shader_info_buffer);
-    }
-
-    // default frag shader
-    {
-        fragment_shader = glCreateShader(GL_FRAGMENT_SHADER);
-        glShaderSource(fragment_shader, 1, (const char* const*)&fragment_shader_text, NULL);
-        glCompileShader(fragment_shader);
-
-        glGetShaderInfoLog(fragment_shader, 200, &shader_info_len, shader_info_buffer);
-        if (shader_info_len) printf("Fragment Shader: %s\n", shader_info_buffer);
-    }
-
     // default shader program
     {
-        program = glCreateProgram();
-        glAttachShader(program, vertex_shader);
-        glAttachShader(program, fragment_shader);
-        glLinkProgram(program);
-
-        glGetProgramInfoLog(program, 200, &shader_info_len, shader_info_buffer);
-        if (shader_info_len) printf("Shader Program: %s\n", shader_info_buffer);
+        GLuint vert = compile_shader(GL_VERTEX_SHADER, "shaders/vert.glsl");
+        GLuint frag = compile_shader(GL_FRAGMENT_SHADER, "shaders/frag.glsl");
+        program = create_program(vert, frag);
     }
 
     // load models

@@ -20,13 +20,18 @@ uniform int shininess;
 
 uniform float farPlane;
 
+uniform bool hasNormalMap;
+
 uniform samplerCube shadowMap;
 uniform sampler2D ditherPattern;
+uniform sampler2D normalMap;
 uniform sampler2D textureA;
 
 smooth in vec3 normal;
 smooth in vec3 fragPos;
 smooth in vec2 texCoords;
+
+in mat3 TBN;
 
 // TODO: separate shader for non-point light sources
 //uniform sampler2D shadowMap;
@@ -79,9 +84,22 @@ void main() {
         objColor = forcedColor;
 
     //vec3 lightColor = vec3(1.0, 1.0, 1.0);
-    vec3 lightColor = vec3(1.0, 1.0, 1.0) * 5.0;
+    vec3 lightColor = vec3(1.0, 1.0, 1.0) * 3.0;
 
-    vec3 norm = normalize(normal);
+    vec3 norm;
+    if (hasNormalMap) {
+        norm = texture(normalMap, texCoords).rgb * 2.0 - 1.0;
+        norm = normalize(TBN * normalize(norm));
+	} else {
+        norm = normalize(normal);
+	}
+
+    //gl_FragColor = vec4(texture(normalMap, texCoords).rgb * 2.0 - 1.0, 1.0);
+    //gl_FragColor = vec4(abs(TBN[1]), 1.0);
+    //gl_FragColor = vec4(TBN[1], 1.0);
+    //gl_FragColor = vec4(norm, 1.0);
+
+    
     vec3 lightDir = normalize(lightPos - fragPos);
     float dist = length(lightPos - fragPos);
 
@@ -93,13 +111,11 @@ void main() {
     vec3 diffuseContrib = diffuseTmp * lightColor;
 
     // specular (TODO: review this)
-    /*
-    float specularTmp = 0.5;
-    vec3 cameraDir = normalize(cameraPos - fragPos);
-    vec3 reflectDir = reflect(-lightDir, norm); 
-    specularTmp = specularTmp * pow(max(dot(cameraDir, reflectDir), 0.0), shininess);
-    vec3 specularContrib = specularTmp * lightColor;
-    */
+    //float specularTmp = 0.5;
+    //vec3 cameraDir = normalize(cameraPos - fragPos);
+    //vec3 reflectDir = reflect(-lightDir, norm); 
+    //specularTmp = specularTmp * pow(max(dot(cameraDir, reflectDir), 0.0), shininess);
+    //vec3 specularContrib = specularTmp * lightColor;
 
     // TODO: play with attenuation values
     float attenuation = 10.0 / (dist * dist);
@@ -107,17 +123,15 @@ void main() {
     vec3 result = ((diffuseContrib * (1.0 - is_shadowed(fragPos, norm)) * attenuation) + ambientContrib) * objColor;
     //vec3 result = objColor;
 
-    /*
     // draw grid
-    if (gridEnabled) {
-        float dist = length(cursorPos - fragPos);
-        vec3 targetColor = mix(GRID_CELL_BORDER_COLOR, result, smoothstep(0.0, GRID_HIGHLIGHT_SIZE, float(dist)));
-        float x_offset = abs(fragPos.x - round(fragPos.x / GRID_CELL_SIZE) * GRID_CELL_SIZE);
-        float z_offset = abs(fragPos.z - round(fragPos.z / GRID_CELL_SIZE) * GRID_CELL_SIZE);
-        result = mix(targetColor, result, smoothstep(0.0, GRID_LINE_WEIGHT, abs(fragPos.x - round(fragPos.x / GRID_CELL_SIZE) * GRID_CELL_SIZE)));
-        result = mix(targetColor, result, smoothstep(0.0, GRID_LINE_WEIGHT, abs(fragPos.z - round(fragPos.z / GRID_CELL_SIZE) * GRID_CELL_SIZE)));
-    }
-    */
+    //if (gridEnabled) {
+        //float dist = length(cursorPos - fragPos);
+        //vec3 targetColor = mix(GRID_CELL_BORDER_COLOR, result, smoothstep(0.0, GRID_HIGHLIGHT_SIZE, float(dist)));
+        //float x_offset = abs(fragPos.x - round(fragPos.x / GRID_CELL_SIZE) * GRID_CELL_SIZE);
+       // float z_offset = abs(fragPos.z - round(fragPos.z / GRID_CELL_SIZE) * GRID_CELL_SIZE);
+      //  result = mix(targetColor, result, smoothstep(0.0, GRID_LINE_WEIGHT, abs(fragPos.x - round(fragPos.x / GRID_CELL_SIZE) * GRID_CELL_SIZE)));
+     //   result = mix(targetColor, result, smoothstep(0.0, GRID_LINE_WEIGHT, abs(fragPos.z - round(fragPos.z / GRID_CELL_SIZE) * GRID_CELL_SIZE)));
+    //}
 
     // gamma correction
     result = pow(result, vec3(1.0/2.2));

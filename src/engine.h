@@ -13,19 +13,22 @@ struct Face {
 };
 
 struct Model {
-    GLuint texture_id;
     FaceType face_type;
 
+    int num_faces;
     vec3* vertices;
     vec3* normals;
     vec2* texture_coords;
-    int num_faces;
     bool has_texture;
+    GLuint texture_id;
 
     // Note: currently only generated for the ground
     vec3* tangents;
     vec3* bitangents;
     bool has_tangents;
+
+    bool has_normal_map;
+    GLuint normal_map_id;
 };
 
 enum ObjectType {

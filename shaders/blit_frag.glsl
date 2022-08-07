@@ -14,6 +14,7 @@ float linearize_depth(float depth) {
 
 void main() {
 	//float depth = linearize_depth(texture(tex, texCoords).r) / 300.0; // TODO: why?
-	float depth = texture(tex, texCoords).r * 4;
+	//float depth = texture(tex, texCoords).r * 4;
+	vec3 depth = texture(tex, texCoords).rgb;
 	gl_FragColor = vec4(vec3(depth), 1.0);
 }

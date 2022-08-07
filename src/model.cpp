@@ -34,7 +34,12 @@ int loadTexture(const char* filename)
     return tex;
 }
 
-int loadModel(const char* obj_filename, const char* texture_filename, FaceType face_type, bool calculate_tangents)
+void model_add_normal_map(Model* model, const char *normal_map_filename) {
+    model->has_normal_map = true;
+    model->normal_map_id = loadTexture(normal_map_filename);
+}
+
+int loadModel(const char* obj_filename, const char *texture_filename, FaceType face_type, bool calculate_tangents)
 {
     File file = {0};
 
@@ -136,19 +141,15 @@ int loadModel(const char* obj_filename, const char* texture_filename, FaceType f
 
         // calculate tangents and bitangents if requested (outside this loop, when we have all vertex information loaded)
         if (calculate_tangents) {
-            int j;
-
-            j = 0;
-
             // face vertices
             vec3 A = { model->vertices[k][0], model->vertices[k][1], model->vertices[k][2] };
             vec3 B = { model->vertices[k+1][0], model->vertices[k+1][1], model->vertices[k+1][2] };
             vec3 C = { model->vertices[k+2][0], model->vertices[k+2][1], model->vertices[k+2][2] };
 
             // face UB
-            vec3 UV_A = { model->texture_coords[k][0], model->texture_coords[k][1], model->texture_coords[k][2] };
-            vec3 UV_B = { model->texture_coords[k+1][0], model->texture_coords[k+1][1], model->texture_coords[k+1][2] };
-            vec3 UV_C = { model->texture_coords[k+2][0], model->texture_coords[k+2][1], model->texture_coords[k+2][2] };
+            vec2 UV_A = { model->texture_coords[k][0], model->texture_coords[k][1] };
+			vec2 UV_B = { model->texture_coords[k + 1][0], model->texture_coords[k + 1][1] };
+			vec2 UV_C = { model->texture_coords[k + 2][0], model->texture_coords[k + 2][1] };
 
             vec3 AB, AC;
             glm_vec3_sub(B, A, AB);
@@ -205,14 +206,23 @@ void draw_model_impl(int program, Object obj, bool force_color)
     glBindVertexArray(0);
 }
 
-void draw_model(int program, Object obj)
+void draw_model(int program, Object obj, RenderPass pass)
 {
     bool has_texture = loaded_models[obj.model_id].has_texture;
-    glUniform1i(glGetUniformLocation(program, "hasTexture"), has_texture);
-    glUniform1f(glGetUniformLocation(program, "scaleTexCoords"), obj.scale_tex_coords);
-    if (has_texture) {
-        glActiveTexture(GL_TEXTURE2);
-        glBindTexture(GL_TEXTURE_2D, loaded_models[obj.model_id].texture_id);
+    bool has_normal_map = loaded_models[obj.model_id].has_normal_map;
+
+    if (pass == PASS_FINAL) {
+        glUniform1i(glGetUniformLocation(program, "hasTexture"), has_texture);
+        glUniform1f(glGetUniformLocation(program, "scaleTexCoords"), obj.scale_tex_coords);
+        glUniform1f(glGetUniformLocation(program, "hasNormalMap"), has_normal_map);
+        if (has_texture) {
+            glActiveTexture(GL_TEXTURE2);
+            glBindTexture(GL_TEXTURE_2D, loaded_models[obj.model_id].texture_id);
+        }
+        if (has_normal_map) {
+            glActiveTexture(GL_TEXTURE3);
+            glBindTexture(GL_TEXTURE_2D, loaded_models[obj.model_id].normal_map_id);
+        }
     }
         
     draw_model_impl(program, obj, false);
@@ -241,10 +251,12 @@ Object create_object(ObjectType type, int model_id, float x, float y, float z, f
 
 	// TODO: perhaps use glGetUniformLocation for vertex indices
     glBindVertexArray(obj.vao);
-	    GLuint vbo1, vbo2, vbo3;
+	    GLuint vbo1, vbo2, vbo3, vbo4, vbo5;
         glGenBuffers(1, &vbo1);
         glGenBuffers(1, &vbo2);
         glGenBuffers(1, &vbo3);
+        glGenBuffers(1, &vbo4);
+        glGenBuffers(1, &vbo5);
 
         glEnableVertexAttribArray(0);
         glBindBuffer(GL_ARRAY_BUFFER, vbo1);
@@ -256,10 +268,24 @@ Object create_object(ObjectType type, int model_id, float x, float y, float z, f
         glBufferData(GL_ARRAY_BUFFER, loaded_models[obj.model_id].num_faces * 3 * sizeof(vec3), loaded_models[obj.model_id].normals, GL_STATIC_DRAW);
         glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, sizeof(float) * 3, (void*)0);
 
-        glEnableVertexAttribArray(2);
-        glBindBuffer(GL_ARRAY_BUFFER, vbo3);
-        glBufferData(GL_ARRAY_BUFFER, loaded_models[obj.model_id].num_faces * 3 * sizeof(vec2), loaded_models[obj.model_id].texture_coords, GL_STATIC_DRAW);
-        glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, sizeof(float) * 2, (void*)0);
+        if (loaded_models[obj.model_id].has_texture) {
+            glEnableVertexAttribArray(2);
+            glBindBuffer(GL_ARRAY_BUFFER, vbo3);
+            glBufferData(GL_ARRAY_BUFFER, loaded_models[obj.model_id].num_faces * 3 * sizeof(vec2), loaded_models[obj.model_id].texture_coords, GL_STATIC_DRAW);
+            glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, sizeof(float) * 2, (void*)0);
+        }
+
+        if (loaded_models[obj.model_id].has_normal_map) {
+            glEnableVertexAttribArray(3);
+            glBindBuffer(GL_ARRAY_BUFFER, vbo4);
+            glBufferData(GL_ARRAY_BUFFER, loaded_models[obj.model_id].num_faces * 3 * sizeof(vec3), loaded_models[obj.model_id].tangents, GL_STATIC_DRAW);
+            glVertexAttribPointer(3, 3, GL_FLOAT, GL_FALSE, sizeof(float) * 3, (void*)0);
+
+            glEnableVertexAttribArray(4);
+            glBindBuffer(GL_ARRAY_BUFFER, vbo5);
+            glBufferData(GL_ARRAY_BUFFER, loaded_models[obj.model_id].num_faces * 3 * sizeof(vec3), loaded_models[obj.model_id].bitangents, GL_STATIC_DRAW);
+            glVertexAttribPointer(4, 3, GL_FLOAT, GL_FALSE, sizeof(float) * 3, (void*)0);
+        }
     glBindVertexArray(0);
 
     return obj;

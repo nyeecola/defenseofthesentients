@@ -212,6 +212,7 @@ void render_scene(float width, float height, float mouse_x, float mouse_y,
         glUniform1i(glGetUniformLocation(program, "shadowMap"), 0);
         glUniform1i(glGetUniformLocation(program, "ditherPattern"), 1);
         glUniform1i(glGetUniformLocation(program, "textureA"), 2);
+        glUniform1i(glGetUniformLocation(program, "normalMap"), 3);
         glUniformMatrix4fv(glGetUniformLocation(program, "shadow_map_matrix"), 1, GL_FALSE, (const GLfloat*)light.shadow_map_matrix);
 		glUniform3fv(glGetUniformLocation(program, "cameraPos"), 1, camera.pos);
         break;
@@ -249,10 +250,10 @@ void render_scene(float width, float height, float mouse_x, float mouse_y,
 				glUniform3fv(glGetUniformLocation(program, "cursorPos"), 1, target_pos);
 			}
             //draw_model_force_rgb(program, *obj, 0.7, 0.4, 0.08);
-            draw_model(program, *obj);
+            draw_model(program, *obj, pass);
 			glUniform1i(glGetUniformLocation(program, "gridEnabled"), 0);
         } else {
-			draw_model(program, *obj);
+			draw_model(program, *obj, pass);
         }
     }
 
@@ -477,13 +478,14 @@ int main(int argc, char** argv)
     int monkey_id = loadModel("assets/monkey.obj", NULL, VERTEX_TEXTURE, false);
     int man_id = loadModel("assets/man.obj", NULL, VERTEX_TEXTURE, false);
     //int man_id = loadModel("assets/xbot.fbx", NULL, VERTEX_TEXTURE, false);
-    int plane_id = loadModel("assets/plane.obj", "assets/ground.jpg", VERTEX_TEXTURE, true);
+    int plane_id = loadModel("assets/plane.obj", "assets/ground2.jpg", VERTEX_TEXTURE, true);
+    model_add_normal_map(&loaded_models[plane_id], "assets/ground2_normal_map3.jpg");
 
     // initialize scene geometry
 	Object man = create_object(OBJ_CHARACTER, man_id, 0, 0, 0, 5, 2, 2);
 	Object man2 = create_object(OBJ_CHARACTER, man_id, 5, 0, 3, 5, 2, 2);
 	Object plane = create_object(OBJ_GROUND, plane_id, 0, 0, 0, 0, 1, 256);
-    plane.scale_tex_coords = 20.0;
+    plane.scale_tex_coords = 16.0;
     Object *scene_geometry[] = { &man, &man2, &plane };
     int obj_count = sizeof(scene_geometry) / sizeof(*scene_geometry);
 
@@ -520,11 +522,12 @@ int main(int argc, char** argv)
     GLuint dither_tex;
     glGenTextures(1, &dither_tex);
     glBindTexture(GL_TEXTURE_2D, dither_tex);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-    glTexImage2D(GL_TEXTURE_2D, 0, GL_RED, 8, 8, 0, GL_RED, GL_UNSIGNED_BYTE, dither_pattern);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+		glTexImage2D(GL_TEXTURE_2D, 0, GL_RED, 8, 8, 0, GL_RED, GL_UNSIGNED_BYTE, dither_pattern);
+    glBindTexture(GL_TEXTURE_2D, 0);
 
     float last_fps_update = glfwGetTime();
     int num_frames = 0;
@@ -599,7 +602,8 @@ int main(int argc, char** argv)
 #else
         POLL_GL_ERROR;
         // blit shadow map to screen quad
-        blit_texture(width, height, shadow_map_tex);
+        //blit_texture(width, height, shadow_map_tex);
+        blit_texture(width, height, loaded_models[plane_id].normal_map_id);
 #endif
 
         // present

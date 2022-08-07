@@ -1,4 +1,5 @@
-void destroyModel(int model) {
+void destroyModel(int model)
+{
     free(loaded_models[model].vertices);
     free(loaded_models[model].normals);
     free(loaded_models[model].texture_coords);
@@ -8,7 +9,33 @@ void destroyModel(int model) {
     }
 }
 
-int loadModel(const char* obj_filename, const char* texture_filename, FaceType face_type, int texture_size, bool calculate_tangents) {
+int loadTexture(const char* filename)
+{
+    assert(filename);
+    int w, h, n;
+    stbi_set_flip_vertically_on_load(true);
+    unsigned char* pixels = stbi_load(filename, &w, &h, &n, 3);
+    assert(pixels && w > 0 && h > 0 && n == 3);
+
+    GLuint tex;
+    glGenTextures(1, &tex);
+
+    glBindTexture(GL_TEXTURE_2D, tex);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+        glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, w, h, 0, GL_RGB, GL_UNSIGNED_BYTE, pixels);
+        glGenerateMipmap(GL_TEXTURE_2D);
+    glBindTexture(GL_TEXTURE_2D, 0);
+
+    stbi_image_free(pixels);
+
+    return tex;
+}
+
+int loadModel(const char* obj_filename, const char* texture_filename, FaceType face_type, bool calculate_tangents)
+{
     File file = {0};
 
     file.vertices = (vec3*) malloc(MAX_OBJ_SIZE * sizeof(vec3));
@@ -67,10 +94,13 @@ int loadModel(const char* obj_filename, const char* texture_filename, FaceType f
 
     Model* model = &loaded_models[loaded_models_n];
 
-    if (face_type == VERTEX_ALL || face_type == VERTEX_ALL_ALPHA) {
-        model->has_texture = true;
-        // TODO
-        //model->texture_id = loadTexture(texture_filename, face_type, texture_size);
+    if (face_type == VERTEX_ALL || face_type == VERTEX_ALL_ALPHA || face_type == VERTEX_TEXTURE) {
+        if (texture_filename) {
+            model->has_texture = true;
+            model->texture_id = loadTexture(texture_filename);
+        } else {
+            fprintf(stderr, "Warning: Texture requested, but no filename given!\n");
+        }
     }
     model->face_type = face_type;
     model->num_faces = file.num_faces;
@@ -79,6 +109,7 @@ int loadModel(const char* obj_filename, const char* texture_filename, FaceType f
     model->texture_coords = (vec2*) malloc(model->num_faces * 3 * sizeof(vec2));
 
     if (calculate_tangents) {
+        model->has_tangents = true;
         model->tangents = (vec3*)malloc(model->num_faces * 3 * sizeof(vec3));
         model->bitangents = (vec3*)malloc(model->num_faces * 3 * sizeof(vec3));
     }
@@ -167,7 +198,6 @@ void draw_model_impl(int program, Object obj, bool force_color)
     glm_rotate(mat, rad, axis);
     glm_scale_uni(mat, obj.scale);
     glUniform1i(glGetUniformLocation(program, "forceColor"), force_color);
-    glUniform1i(glGetUniformLocation(program, "hasTexture"), loaded_models[obj.model_id].has_texture);
     glUniform1i(glGetUniformLocation(program, "shininess"), obj.shininess);
     glUniformMatrix4fv(glGetUniformLocation(program, "model"), 1, GL_FALSE, (const GLfloat*)mat);
     glBindVertexArray(obj.vao);
@@ -177,6 +207,14 @@ void draw_model_impl(int program, Object obj, bool force_color)
 
 void draw_model(int program, Object obj)
 {
+    bool has_texture = loaded_models[obj.model_id].has_texture;
+    glUniform1i(glGetUniformLocation(program, "hasTexture"), has_texture);
+    glUniform1f(glGetUniformLocation(program, "scaleTexCoords"), obj.scale_tex_coords);
+    if (has_texture) {
+        glActiveTexture(GL_TEXTURE2);
+        glBindTexture(GL_TEXTURE_2D, loaded_models[obj.model_id].texture_id);
+    }
+        
     draw_model_impl(program, obj, false);
 }
 
@@ -184,6 +222,7 @@ void draw_model_force_rgb(int program, Object obj, float r, float g, float b)
 {
     vec3 color = { r, g, b };
     glUniform3fv(glGetUniformLocation(program, "forcedColor"), 1, color);
+    glUniform1i(glGetUniformLocation(program, "hasTexture"), 0);
     draw_model_impl(program, obj, true);
 }
 
@@ -198,12 +237,14 @@ Object create_object(ObjectType type, int model_id, float x, float y, float z, f
     obj.speed = speed;
     obj.scale = scale;
     obj.shininess = shininess;
+    obj.scale_tex_coords = 1.0;
 
+	// TODO: perhaps use glGetUniformLocation for vertex indices
     glBindVertexArray(obj.vao);
-        // NOTE: OpenGL error checks have been omitted for brevity
-        GLuint vbo1, vbo2;
+	    GLuint vbo1, vbo2, vbo3;
         glGenBuffers(1, &vbo1);
         glGenBuffers(1, &vbo2);
+        glGenBuffers(1, &vbo3);
 
         glEnableVertexAttribArray(0);
         glBindBuffer(GL_ARRAY_BUFFER, vbo1);
@@ -214,6 +255,11 @@ Object create_object(ObjectType type, int model_id, float x, float y, float z, f
         glBindBuffer(GL_ARRAY_BUFFER, vbo2);
         glBufferData(GL_ARRAY_BUFFER, loaded_models[obj.model_id].num_faces * 3 * sizeof(vec3), loaded_models[obj.model_id].normals, GL_STATIC_DRAW);
         glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, sizeof(float) * 3, (void*)0);
+
+        glEnableVertexAttribArray(2);
+        glBindBuffer(GL_ARRAY_BUFFER, vbo3);
+        glBufferData(GL_ARRAY_BUFFER, loaded_models[obj.model_id].num_faces * 3 * sizeof(vec2), loaded_models[obj.model_id].texture_coords, GL_STATIC_DRAW);
+        glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, sizeof(float) * 2, (void*)0);
     glBindVertexArray(0);
 
     return obj;

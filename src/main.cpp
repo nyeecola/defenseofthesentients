@@ -208,8 +208,10 @@ void render_scene(float width, float height, float mouse_x, float mouse_y,
 
     switch (pass) {
     case PASS_FINAL:
+        // TODO: refactor this to make it maintainable with many textures
         glUniform1i(glGetUniformLocation(program, "shadowMap"), 0);
         glUniform1i(glGetUniformLocation(program, "ditherPattern"), 1);
+        glUniform1i(glGetUniformLocation(program, "textureA"), 2);
         glUniformMatrix4fv(glGetUniformLocation(program, "shadow_map_matrix"), 1, GL_FALSE, (const GLfloat*)light.shadow_map_matrix);
 		glUniform3fv(glGetUniformLocation(program, "cameraPos"), 1, camera.pos);
         break;
@@ -246,7 +248,8 @@ void render_scene(float width, float height, float mouse_x, float mouse_y,
 				vec3 target_pos = { camera.pos[0] + t * ray_world[0], 0, camera.pos[2] + t * ray_world[2] };
 				glUniform3fv(glGetUniformLocation(program, "cursorPos"), 1, target_pos);
 			}
-			draw_model_force_rgb(program, *obj, 0.8, 0.7, 0.7);
+            //draw_model_force_rgb(program, *obj, 0.7, 0.4, 0.08);
+            draw_model(program, *obj);
 			glUniform1i(glGetUniformLocation(program, "gridEnabled"), 0);
         } else {
 			draw_model(program, *obj);
@@ -255,7 +258,8 @@ void render_scene(float width, float height, float mouse_x, float mouse_y,
 
 }
 
-void initialize_shadow_map_fbo(GLuint *fbo, GLuint *tex, Light light) {
+void initialize_shadow_map_fbo(GLuint *fbo, GLuint *tex, Light light)
+{
     // TODO: remember to free resources
     glGenFramebuffers(1, fbo);
     glGenTextures(1, tex);
@@ -470,15 +474,16 @@ int main(int argc, char** argv)
     }
 
     // load models
-    int monkey_id = loadModel("assets/monkey.obj", NULL, VERTEX_TEXTURE, 1024, false);
-    int man_id = loadModel("assets/man.obj", NULL, VERTEX_TEXTURE, 1024, false);
-    //int man_id = loadModel("assets/xbot.fbx", NULL, VERTEX_TEXTURE, 1024, false);
-    int plane_id = loadModel("assets/plane.obj", NULL, VERTEX_TEXTURE, 1024, true);
+    int monkey_id = loadModel("assets/monkey.obj", NULL, VERTEX_TEXTURE, false);
+    int man_id = loadModel("assets/man.obj", NULL, VERTEX_TEXTURE, false);
+    //int man_id = loadModel("assets/xbot.fbx", NULL, VERTEX_TEXTURE, false);
+    int plane_id = loadModel("assets/plane.obj", "assets/ground.jpg", VERTEX_TEXTURE, true);
 
     // initialize scene geometry
 	Object man = create_object(OBJ_CHARACTER, man_id, 0, 0, 0, 5, 2, 2);
 	Object man2 = create_object(OBJ_CHARACTER, man_id, 5, 0, 3, 5, 2, 2);
 	Object plane = create_object(OBJ_GROUND, plane_id, 0, 0, 0, 0, 1, 256);
+    plane.scale_tex_coords = 20.0;
     Object *scene_geometry[] = { &man, &man2, &plane };
     int obj_count = sizeof(scene_geometry) / sizeof(*scene_geometry);
 

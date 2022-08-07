@@ -25,6 +25,7 @@ struct Model {
     // Note: currently only generated for the ground
     vec3* tangents;
     vec3* bitangents;
+    bool has_tangents;
 };
 
 enum ObjectType {
@@ -43,6 +44,8 @@ typedef struct {
     vec3 pos;
     vec2 dir; /* TODO: do we need vec3 here? */
     float speed; /* maybe separate this field in another struct */
+
+    float scale_tex_coords;
 } Object;
 
 /* Util */

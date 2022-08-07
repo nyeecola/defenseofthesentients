@@ -18,13 +18,15 @@ uniform vec3 cursorPos;
 
 uniform int shininess;
 
-uniform samplerCube shadowMap;
 uniform float farPlane;
 
+uniform samplerCube shadowMap;
 uniform sampler2D ditherPattern;
+uniform sampler2D textureA;
 
 smooth in vec3 normal;
 smooth in vec3 fragPos;
+smooth in vec2 texCoords;
 
 // TODO: separate shader for non-point light sources
 //uniform sampler2D shadowMap;
@@ -68,17 +70,13 @@ vec3 dither(vec3 og_color)  {
 }
 
 void main() {
-    //vec3 objColor = vec3(1.0, 0.8, 0.6); // default color when no texture is passed
-    vec3 objColor = vec3(0.7, 0.4, 0.08);
-    if (hasTexture) {
-        // objColor = tex...
-    }
+    vec3 objColor = vec3(1.0);
 
-    /*
-    if (forceColor) {
+    if (hasTexture)
+        objColor = texture(textureA, texCoords).rgb;
+
+    if (forceColor)
         objColor = forcedColor;
-    }
-    */
 
     //vec3 lightColor = vec3(1.0, 1.0, 1.0);
     vec3 lightColor = vec3(1.0, 1.0, 1.0) * 5.0;

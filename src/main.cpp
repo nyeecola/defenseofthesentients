@@ -8,6 +8,7 @@
 #include <stdio.h>
 #include <stdbool.h>
 #include <assert.h>
+#include <cmath>
 
 #define CGLM_ALL_UNALIGNED
 #include <cglm/cglm.h>
@@ -166,9 +167,57 @@ void blit_texture(GLuint width, GLuint height, GLuint texture) {
     POLL_GL_ERROR;
 }
 
+void screen_to_world_space_ray(vec3 camera_pos, float x, float y,
+                               mat4 proj_mat, mat4 view_mat,
+                               vec3 out_ray_origin, vec3 out_ray_dir)
+{
+	vec4 ray_clip = { x, y, -1, 1 };
+	mat4 proj_mat_inv;
+	glm_mat4_inv(proj_mat, proj_mat_inv);
+	glm_mat4_mulv(proj_mat_inv, ray_clip, ray_clip);
+
+	vec4 ray_eye = { ray_clip[0], ray_clip[1], -1, 0 };
+	mat4 view_mat_inv;
+	glm_mat4_inv(view_mat, view_mat_inv);
+	glm_mat4_mulv(view_mat_inv, ray_eye, ray_eye);
+
+    // we're in world space now
+    glm_vec3_copy(ray_eye, out_ray_dir);
+	glm_vec3_normalize(out_ray_dir);
+
+    glm_vec3_copy(camera_pos, out_ray_origin);
+}
+
+void ray_plane_intersection(vec3 ray_origin, vec3 ray_dir,
+                            vec3 plane_normal, float plane_offset,
+                            vec3 out_point)
+{
+	// Ray vs Plane
+	// Plane equation: dot(N, P) + d = 0
+	// Ray equation: P = O + t * D
+	//
+	// Intersection: dot(N, O + t * D) + d = 0
+	// dot(N, O + t * D) + d = 0
+	// dot(N, O) + dot(N, t * D) + d = 0
+	// dot(N, O) + dot(N, D) * t + d = 0
+	// dot(N, D) * t = - (dot(N, O) + d)
+	// t = - (dot(N, O) + d) / dot(N, D)
+    float denominator = glm_vec3_dot(plane_normal, ray_dir);
+    if (abs(denominator) < 0.0001f) {
+        vec3 zero = GLM_VEC3_ZERO_INIT;
+        glm_vec3_copy(zero, out_point);
+        return;
+    }
+        
+    float t = -(glm_vec3_dot(plane_normal, ray_origin) - plane_offset) /
+				denominator;
+    glm_vec3_scale(ray_dir, t, ray_dir);
+    glm_vec3_add(ray_origin, ray_dir, out_point);
+}
+
 // TODO: put all this state in a struct
 void render_scene(float width, float height, float mouse_x, float mouse_y,
-                  Camera camera, Light light, mat4 view_mat,
+                  Camera camera, Light *light, mat4 view_mat,
                   Object **scene_geometry, int num_scene_geom,
                   GLuint program, RenderPass pass) {
     float ratio = width / height;
@@ -181,11 +230,12 @@ void render_scene(float width, float height, float mouse_x, float mouse_y,
     glUseProgram(program);
 
     switch (pass) {
-    case PASS_FINAL:
+    case PASS_FINAL: {
         glm_perspective(GLM_PI_4f, ratio, 0.01f, far_plane, proj_mat);
         glDisable(GL_CULL_FACE); // TODO: reenable
         glCullFace(GL_BACK);
         break;
+    }
     case PASS_SHADOW_MAP:
         glm_perspective(GLM_PI_2f, ratio, 0.01f, far_plane, proj_mat);
         glEnable(GL_CULL_FACE);
@@ -213,40 +263,34 @@ void render_scene(float width, float height, float mouse_x, float mouse_y,
         glUniform1i(glGetUniformLocation(program, "ditherPattern"), 1);
         glUniform1i(glGetUniformLocation(program, "textureA"), 2);
         glUniform1i(glGetUniformLocation(program, "normalMap"), 3);
-        glUniformMatrix4fv(glGetUniformLocation(program, "shadow_map_matrix"), 1, GL_FALSE, (const GLfloat*)light.shadow_map_matrix);
+        glUniformMatrix4fv(glGetUniformLocation(program, "shadow_map_matrix"), 1, GL_FALSE, (const GLfloat*)light->shadow_map_matrix);
 		glUniform3fv(glGetUniformLocation(program, "cameraPos"), 1, camera.pos);
         break;
     case PASS_SHADOW_MAP:
-		glUniform3fv(glGetUniformLocation(program, "cameraPos"), 1, light.pos);
-        glm_mat4_copy(view_proj, light.shadow_map_matrix);
+		glUniform3fv(glGetUniformLocation(program, "cameraPos"), 1, light->pos);
+        glm_mat4_copy(view_proj, light->shadow_map_matrix);
         break;
     default:
         assert(false && "UNKNOWN RENDER PASS!");
         break;
     }
 
-    glUniform3fv(glGetUniformLocation(program, "lightPos"), 1, light.pos);
-    glUniform1f(glGetUniformLocation(program, "farPlane"), far_plane);
+    glUniform3fv(glGetUniformLocation(program, "lightPos"), 1, light->pos);
+    glUniform1f(glGetUniformLocation(program, "farPlane"), FAR_PLANE);
     glUniformMatrix4fv(glGetUniformLocation(program, "view_proj"), 1, GL_FALSE, (const GLfloat*)view_proj);
 
     for (int i = 0; i < num_scene_geom; i++) {
         Object *obj = scene_geometry[i];
         if (obj->type == OBJ_GROUND) {
 			if (pass == PASS_FINAL) { // we don't care about the grid when doing shadow mapping
-				// TODO: refactor
 				glUniform1i(glGetUniformLocation(program, "gridEnabled"), grid_enabled);
-				vec4 ray_clip = { mouse_x, mouse_y, -1, 1 };
-				mat4 proj_mat_inv;
-				glm_mat4_inv(proj_mat, proj_mat_inv);
-				glm_mat4_mulv(proj_mat_inv, ray_clip, ray_clip);
-				vec4 ray_eye = { ray_clip[0], ray_clip[1], -1, 0 };
-				mat4 view_mat_inv;
-				glm_mat4_inv(view_mat, view_mat_inv);
-				glm_mat4_mulv(view_mat_inv, ray_eye, ray_eye);
-				vec3 ray_world = { ray_eye[0], ray_eye[1], ray_eye[2] };
-				glm_vec3_normalize(ray_world);
-				float t = -camera.pos[1] / ray_world[1];
-				vec3 target_pos = { camera.pos[0] + t * ray_world[0], 0, camera.pos[2] + t * ray_world[2] };
+                vec3 ray_origin, ray_dir;
+                screen_to_world_space_ray(camera.pos, mouse_x, mouse_y,
+                                          proj_mat, view_mat,
+                                          ray_origin, ray_dir);
+                vec3 plane_normal = { 0.0, 1.0, 0.0 };
+                vec3 target_pos;
+                ray_plane_intersection(ray_origin, ray_dir, plane_normal, 0.0f, target_pos);
 				glUniform3fv(glGetUniformLocation(program, "cursorPos"), 1, target_pos);
 			}
             //draw_model_force_rgb(program, *obj, 0.7, 0.4, 0.08);
@@ -257,6 +301,24 @@ void render_scene(float width, float height, float mouse_x, float mouse_y,
         }
     }
 
+    if (pass == PASS_FINAL) {
+        // TODO: separate this from the rendering, currently it's also
+        // one frame delayed because of this coupling.
+        // move the light with the mouse
+        vec3 ray_origin, ray_dir;
+        screen_to_world_space_ray(camera.pos, mouse_x, mouse_y,
+            proj_mat, view_mat,
+            ray_origin, ray_dir);
+        vec3 plane_normal = { 0.0, 1.0, 0.0 };
+        vec3 target_pos;
+        ray_plane_intersection(ray_origin, ray_dir, plane_normal,
+            light->pos[1], target_pos);
+        fprintf(stderr, "%f %f %f -> %f %f %f\n",
+            target_pos[0], target_pos[1], target_pos[2],
+            light->pos[0], light->pos[2], light->pos[3]);
+        if (glm_vec3_norm(target_pos) > 0.95f)
+            glm_vec3_copy(target_pos, light->pos);
+    }
 }
 
 void initialize_shadow_map_fbo(GLuint *fbo, GLuint *tex, Light light)
@@ -300,17 +362,17 @@ void initialize_shadow_map_fbo(GLuint *fbo, GLuint *tex, Light light)
 }
 
 void shadow_mapping_pass(GLuint fbo, GLuint tex, Object **scene_geometry,
-                         int obj_count, GLuint program, Light light, Camera camera)
+                         int obj_count, GLuint program, Light *light, Camera camera)
 {
     
     mat4 view_mat;
 
     glBindFramebuffer(GL_FRAMEBUFFER, fbo);
-    switch (light.type) {
+    switch (light->type) {
     case SPOTLIGHT:
     case DIRECTIONAL: {
         vec3 camera_target = { 5, 0, 5 };
-        glm_lookat(light.pos, camera_target, camera.up, view_mat);
+        glm_lookat(light->pos, camera_target, camera.up, view_mat);
         glFramebufferTexture2D(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_TEXTURE_2D, tex, 0);
         render_scene(SHADOW_MAP_RESOLUTION, SHADOW_MAP_RESOLUTION,
                      0, 0, camera, light, view_mat, scene_geometry,
@@ -337,8 +399,8 @@ void shadow_mapping_pass(GLuint fbo, GLuint tex, Object **scene_geometry,
 
         for (int i = 0; i < 6; i++) {
             vec3 camera_target;
-            glm_vec3_add(light.pos, directions[i], camera_target);
-            glm_lookat(light.pos, camera_target, up[i], view_mat);
+            glm_vec3_add(light->pos, directions[i], camera_target);
+            glm_lookat(light->pos, camera_target, up[i], view_mat);
             glFramebufferTexture2D(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT,
                                    GL_TEXTURE_CUBE_MAP_POSITIVE_X + i, tex, 0);
             render_scene(SHADOW_MAP_RESOLUTION, SHADOW_MAP_RESOLUTION,
@@ -355,10 +417,10 @@ void shadow_mapping_pass(GLuint fbo, GLuint tex, Object **scene_geometry,
 }
 
 void final_render(float width, float height, float mouse_x, float mouse_y,
-                  Camera camera, Light light, Object **scene_geometry,
+                  Camera camera, Light *light, Object **scene_geometry,
                   int obj_count, GLuint program, GLuint shadow_map_tex, GLuint dither_tex)
 {
-    GLuint tex_type = light.type == POINTLIGHT ? GL_TEXTURE_CUBE_MAP : GL_TEXTURE_2D;
+    GLuint tex_type = light->type == POINTLIGHT ? GL_TEXTURE_CUBE_MAP : GL_TEXTURE_2D;
 
     glActiveTexture(GL_TEXTURE0);
     glBindTexture(tex_type, shadow_map_tex);
@@ -592,12 +654,12 @@ int main(int argc, char** argv)
         // shadow mapping
         shadow_mapping_pass(shadow_map_fbo, shadow_map_tex,
                             scene_geometry, obj_count,
-                            shadow_map_program, light, camera);
+                            shadow_map_program, &light, camera);
 
 #if 1
         // render actual scene
         final_render(width, height, nds_x, nds_y, camera,
-                     light, scene_geometry, obj_count, program,
+                     &light, scene_geometry, obj_count, program,
                      shadow_map_tex, dither_tex);
 #else
         POLL_GL_ERROR;

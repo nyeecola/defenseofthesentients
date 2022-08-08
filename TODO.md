@@ -1,4 +1,11 @@
 TO DOs:
+- Refactor proj_mat/view_mat, and then move light_pos picking out of the render pipeline
+- Tesselation
+- Raise or lower terrain with mouse click
+
+
+
+
 - Gridlike map
 	- Motivation:
 		- facilitate collision detection (semi-true)

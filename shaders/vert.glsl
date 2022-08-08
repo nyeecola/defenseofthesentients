@@ -29,6 +29,8 @@ void main() {
         vec3 T = normalize(vec3(model * vec4(vTangent, 0.0)));
         vec3 B = normalize(vec3(model * vec4(vBitangent, 0.0)));
         vec3 N = normalize(vec3(model * vec4(vNormal, 0.0)));
+        if (dot(cross(N, T), B) < 0.0)
+            T = T * -1.0;
         TBN = mat3(T, B, N);
 	} else {
         normal = mat3(transpose(inverse(model))) * vNormal; //TODO: do this on CPU

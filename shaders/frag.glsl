@@ -64,7 +64,9 @@ float is_shadowed(vec3 pos, vec3 normal) {
     // transform occluder from [0,1] to [0,farPlane]
     occluder *= farPlane;
 
-    float bias = max(0.05 * (1.0 - dot(normal, normalize(lightPos - pos))), 0.0005);  
+    //float cos_theta = clamp(dot(normal, normalize(lightPos - pos)), 0.0, 1.0);
+    //float bias = clamp(0.01*tan(acos(cos_theta)), 0.0, 0.05);
+    float bias = max(0.005 * (1.0 - dot(normal, normalize(lightPos - pos))), 0.0005);  
     
     return (length(pos_from_light) - bias > occluder) ? 1.0 : 0.0;
 }

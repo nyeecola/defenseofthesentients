@@ -234,7 +234,8 @@ void render_scene(float width, float height, float mouse_x, float mouse_y,
     case PASS_FINAL: {
         glm_perspective(GLM_PI_4f, ratio, 0.01f, far_plane, proj_mat);
         glDisable(GL_CULL_FACE); // TODO: reenable
-        glCullFace(GL_BACK);
+        //glEnable(GL_CULL_FACE); // TODO: reenable
+        glCullFace(GL_FRONT);
         break;
     }
     case PASS_SHADOW_MAP:
@@ -298,7 +299,8 @@ void render_scene(float width, float height, float mouse_x, float mouse_y,
             draw_model(program, *obj, pass);
 			glUniform1i(glGetUniformLocation(program, "gridEnabled"), 0);
         } else {
-			draw_model(program, *obj, pass);
+            // draw_model_force_rgb(program, *obj, 0.8, 0.6, 0.4);
+            draw_model(program, *obj, pass);
         }
     }
 
@@ -338,7 +340,7 @@ void initialize_shadow_map_fbo(GLuint *fbo, GLuint *tex, Light light)
             glTexParameteri(tex_type, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
             glTexParameteri(tex_type, GL_TEXTURE_WRAP_R, GL_CLAMP_TO_EDGE);
         } else {
-            glTexImage2D(tex_type, 0, GL_DEPTH_COMPONENT, SHADOW_MAP_RESOLUTION,
+            glTexImage2D(tex_type, 0, GL_DEPTH_COMPONENT16, SHADOW_MAP_RESOLUTION,
                          SHADOW_MAP_RESOLUTION, 0, GL_DEPTH_COMPONENT, GL_FLOAT, NULL);
             glTexParameteri(tex_type, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_BORDER);
             glTexParameteri(tex_type, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_BORDER);
@@ -452,6 +454,7 @@ Camera create_targeted_camera(vec3 pos, vec3* target)
     camera.type = CAMERA_TARGETED;
     glm_vec3_copy(pos, camera.pos);
     vec3 up = { 0.0, 1.0, 0.0 };
+    //vec3 up = { 0.0, 0.0, -1.0 };
     glm_vec3_copy(up, camera.up);
     camera.target = target;
     return camera;
@@ -511,18 +514,26 @@ int main(int argc, char** argv)
     int man_id = loadModel("assets/man.obj", NULL, VERTEX_TEXTURE, false);
     //int man_id = loadModel("assets/xbot.fbx", NULL, VERTEX_TEXTURE, false);
 #if 0
+#if 0
     int plane_id = loadModel("assets/plane.obj", "assets/ground2.jpg", VERTEX_TEXTURE, true);
     model_add_normal_map(&loaded_models[plane_id], "assets/ground2_normal_map3.jpg");
 #else
-    int plane_id = loadModel("assets/plane.obj", "assets/brickwall.jpg", VERTEX_TEXTURE, true);
+     int plane_id = loadModel("assets/plane.obj", "assets/brickwall_test.jpg", VERTEX_TEXTURE, true);
+    //int plane_id = loadModel("assets/plane.obj", NULL, VERTEX_TEXTURE, false);
+     model_add_normal_map(&loaded_models[plane_id], "assets/brickwall_normal.jpg");
+#endif
+#else
+    //int plane_id = create_tiled_plane(50, 100.0f, 1/25.0f, "assets/brickwall_test.jpg");
+    // TODO: understand what's going on with the tex scale here...
+    int plane_id = create_tiled_plane(50, 1.0f, 1/1.0f, "assets/brickwall_test.jpg");
     model_add_normal_map(&loaded_models[plane_id], "assets/brickwall_normal.jpg");
 #endif
 
     // initialize scene geometry
-	Object man = create_object(OBJ_CHARACTER, man_id, 0, 0, 0, 5, 2, 2);
-	Object man2 = create_object(OBJ_CHARACTER, man_id, 5, 0, 3, 5, 2, 2);
+	Object man = create_object(OBJ_CHARACTER, man_id, 0, 0, 0, 5, 3.0, 2);
+	Object man2 = create_object(OBJ_CHARACTER, man_id, 5, 0, 3, 5, 3.0, 2);
 	Object plane = create_object(OBJ_GROUND, plane_id, 0, 0, 0, 0, 1, 256);
-    plane.scale_tex_coords = 88.0;
+    //plane.scale_tex_coords = 88.0;
     Object *scene_geometry[] = { &man, &man2, &plane };
     int obj_count = sizeof(scene_geometry) / sizeof(*scene_geometry);
 
@@ -534,7 +545,7 @@ int main(int argc, char** argv)
     }
 
     // initialize light data
-    Light light = create_light(POINTLIGHT,   0, 5.0, 8.0,   0, 0, 0);
+    Light light = create_light(POINTLIGHT,   0, 3.0, 8.0,   0, 0, 0);
 
     float delta_time = glfwGetTime();
     float last_time = glfwGetTime();

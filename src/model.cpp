@@ -39,6 +39,46 @@ void model_add_normal_map(Model* model, const char *normal_map_filename) {
     model->normal_map_id = loadTexture(normal_map_filename);
 }
 
+void generate_vertex_tangents_and_bitangents(Model* model, int vertex_idx) {
+    int k = vertex_idx;
+
+	// face vertices
+	vec3 A = { model->vertices[k][0], model->vertices[k][1], model->vertices[k][2] };
+	vec3 B = { model->vertices[k + 1][0], model->vertices[k + 1][1], model->vertices[k + 1][2] };
+	vec3 C = { model->vertices[k + 2][0], model->vertices[k + 2][1], model->vertices[k + 2][2] };
+
+	// face UB
+	vec2 UV_A = { model->texture_coords[k][0], model->texture_coords[k][1] };
+	vec2 UV_B = { model->texture_coords[k + 1][0], model->texture_coords[k + 1][1] };
+	vec2 UV_C = { model->texture_coords[k + 2][0], model->texture_coords[k + 2][1] };
+
+	vec3 AB, AC;
+	glm_vec3_sub(B, A, AB);
+	glm_vec3_sub(C, A, AC);
+
+	vec2 deltaUV_AB, deltaUV_AC;
+	glm_vec2_sub(UV_B, UV_A, deltaUV_AB);
+	glm_vec2_sub(UV_C, UV_A, deltaUV_AC);
+
+	float fract = 1.0f / (deltaUV_AB[0] * deltaUV_AC[1] - deltaUV_AC[0] * deltaUV_AB[1]);
+
+	model->tangents[k][0] = fract * (deltaUV_AC[1] * AB[0] - deltaUV_AB[1] * AC[0]);
+	model->tangents[k][1] = fract * (deltaUV_AC[1] * AB[1] - deltaUV_AB[1] * AC[1]);
+	model->tangents[k][2] = fract * (deltaUV_AC[1] * AB[2] - deltaUV_AB[1] * AC[2]);
+
+	model->bitangents[k][0] = fract * (-deltaUV_AC[0] * AB[0] + deltaUV_AB[0] * AC[0]);
+	model->bitangents[k][1] = fract * (-deltaUV_AC[0] * AB[1] + deltaUV_AB[0] * AC[1]);
+	model->bitangents[k][2] = fract * (-deltaUV_AC[0] * AB[2] + deltaUV_AB[0] * AC[2]);
+
+	// TODO: smoothen bitangents and tangents by averaging them for each vector
+	model->tangents[k + 1][0] = model->tangents[k + 2][0] = model->tangents[k][0];
+	model->tangents[k + 1][1] = model->tangents[k + 2][1] = model->tangents[k][1];
+	model->tangents[k + 1][2] = model->tangents[k + 2][2] = model->tangents[k][2];
+	model->bitangents[k + 1][0] = model->bitangents[k + 2][0] = model->bitangents[k][0];
+	model->bitangents[k + 1][1] = model->bitangents[k + 2][1] = model->bitangents[k][1];
+	model->bitangents[k + 1][2] = model->bitangents[k + 2][2] = model->bitangents[k][2];
+}
+
 int loadModel(const char* obj_filename, const char *texture_filename, FaceType face_type, bool calculate_tangents)
 {
     File file = {0};
@@ -141,41 +181,7 @@ int loadModel(const char* obj_filename, const char *texture_filename, FaceType f
 
         // calculate tangents and bitangents if requested (outside this loop, when we have all vertex information loaded)
         if (calculate_tangents) {
-            // face vertices
-            vec3 A = { model->vertices[k][0], model->vertices[k][1], model->vertices[k][2] };
-            vec3 B = { model->vertices[k+1][0], model->vertices[k+1][1], model->vertices[k+1][2] };
-            vec3 C = { model->vertices[k+2][0], model->vertices[k+2][1], model->vertices[k+2][2] };
-
-            // face UB
-            vec2 UV_A = { model->texture_coords[k][0], model->texture_coords[k][1] };
-			vec2 UV_B = { model->texture_coords[k + 1][0], model->texture_coords[k + 1][1] };
-			vec2 UV_C = { model->texture_coords[k + 2][0], model->texture_coords[k + 2][1] };
-
-            vec3 AB, AC;
-            glm_vec3_sub(B, A, AB);
-            glm_vec3_sub(C, A, AC);
-
-            vec2 deltaUV_AB, deltaUV_AC;
-            glm_vec2_sub(UV_B, UV_A, deltaUV_AB);
-            glm_vec2_sub(UV_C, UV_A, deltaUV_AC);
-
-            float fract = 1.0f / (deltaUV_AB[0] * deltaUV_AC[1] - deltaUV_AC[0] * deltaUV_AB[1]);
-
-            model->tangents[k][0] = fract * (deltaUV_AC[1] * AB[0] - deltaUV_AB[1] * AC[0]);
-            model->tangents[k][1] = fract * (deltaUV_AC[1] * AB[1] - deltaUV_AB[1] * AC[1]);
-            model->tangents[k][2] = fract * (deltaUV_AC[1] * AB[2] - deltaUV_AB[1] * AC[2]);
-
-            model->bitangents[k][0] = fract * (-deltaUV_AC[0] * AB[0] + deltaUV_AB[0] * AC[0]);
-            model->bitangents[k][1] = fract * (-deltaUV_AC[0] * AB[1] + deltaUV_AB[0] * AC[1]);
-            model->bitangents[k][2] = fract * (-deltaUV_AC[0] * AB[2] + deltaUV_AB[0] * AC[2]);
-
-			// TODO: smoothen bitangents and tangents by averaging them for each vector
-            model->tangents[k + 1][0] = model->tangents[k + 2][0] = model->tangents[k][0];
-            model->tangents[k + 1][1] = model->tangents[k + 2][1] = model->tangents[k][1];
-            model->tangents[k + 1][2] = model->tangents[k + 2][2] = model->tangents[k][2];
-            model->bitangents[k + 1][0] = model->bitangents[k + 2][0] = model->bitangents[k][0];
-            model->bitangents[k + 1][1] = model->bitangents[k + 2][1] = model->bitangents[k][1];
-            model->bitangents[k + 1][2] = model->bitangents[k + 2][2] = model->bitangents[k][2];
+            generate_vertex_tangents_and_bitangents(model, k);
 		}
 
         k += 3;
@@ -236,7 +242,8 @@ void draw_model_force_rgb(int program, Object obj, float r, float g, float b)
     draw_model_impl(program, obj, true);
 }
 
-Object create_object(ObjectType type, int model_id, float x, float y, float z, float speed, float scale, float shininess) {
+Object create_object(ObjectType type, int model_id, float x, float y, float z, float speed, float scale, float shininess)
+{
     Object obj = {};
     glGenVertexArrays(1, &obj.vao);
     obj.type = type;
@@ -289,4 +296,166 @@ Object create_object(ObjectType type, int model_id, float x, float y, float z, f
     glBindVertexArray(0);
 
     return obj;
+}
+
+int create_tiled_plane(int subdivisions, float tile_size, float tex_scale, char *texture_filename) {
+    Model *m = &loaded_models[loaded_models_n];
+
+    m->face_type = VERTEX_TEXTURE;
+    
+    int subdivisions_sq = subdivisions * subdivisions;
+
+    // all tiles + 4 single-quad sides + 1 single-quad bottom
+    int num_vertices = subdivisions_sq * 6 + 5 * 6;
+
+    m->num_faces = 2 * subdivisions_sq + 2 * 5;
+    m->vertices = (vec3*) malloc(num_vertices * sizeof(vec3));
+    m->texture_coords = (vec2*) malloc(num_vertices * sizeof(*m->texture_coords));
+    m->normals = (vec3*) malloc(num_vertices * sizeof(*m->normals));
+    m->tangents = (vec3*) malloc(num_vertices * sizeof(*m->tangents));
+    m->bitangents = (vec3*) malloc(num_vertices * sizeof(*m->bitangents));
+    
+    int width = subdivisions * 6;
+    for (int i = 0; i < subdivisions; i++) {
+        for (int j = 0; j < subdivisions; j++) {
+            assert(i * width + j * 6 + 5 < num_vertices);
+
+			m->vertices[i * width + j * 6 + 2][0] = j * tile_size;
+			m->vertices[i * width + j * 6 + 2][1] = 0.0f;
+			m->vertices[i * width + j * 6 + 2][2] = i * tile_size;
+
+			m->vertices[i * width + j * 6 + 1][0] = j * tile_size + tile_size;
+			m->vertices[i * width + j * 6 + 1][1] = 0.0f;
+			m->vertices[i * width + j * 6 + 1][2] = i * tile_size;
+
+			m->vertices[i * width + j * 6 + 0][0] = j * tile_size;
+			m->vertices[i * width + j * 6 + 0][1] = 0.0f;
+			m->vertices[i * width + j * 6 + 0][2] = i * tile_size + tile_size;
+
+			m->vertices[i * width + j * 6 + 5][0] = j * tile_size + tile_size;
+			m->vertices[i * width + j * 6 + 5][1] = 0.0f;
+			m->vertices[i * width + j * 6 + 5][2] = i * tile_size;
+
+			m->vertices[i * width + j * 6 + 4][0] = j * tile_size + tile_size;
+			m->vertices[i * width + j * 6 + 4][1] = 0.0f;
+			m->vertices[i * width + j * 6 + 4][2] = i * tile_size + tile_size;
+
+			m->vertices[i * width + j * 6 + 3][0] = j * tile_size;
+			m->vertices[i * width + j * 6 + 3][1] = 0.0f;
+			m->vertices[i * width + j * 6 + 3][2] = i * tile_size + tile_size;
+
+            m->texture_coords[i * width + j * 6 + 2][0] = m->vertices[i * width + j * 6 + 2][0] * tex_scale;
+			m->texture_coords[i * width + j * 6 + 2][1] = (1 - m->vertices[i * width + j * 6 + 2][2]) * tex_scale;
+
+            m->texture_coords[i * width + j * 6 + 1][0] = m->vertices[i * width + j * 6 + 1][0] * tex_scale;
+			m->texture_coords[i * width + j * 6 + 1][1] = (1 - m->vertices[i * width + j * 6 + 1][2]) * tex_scale;
+
+            m->texture_coords[i * width + j * 6 + 0][0] = m->vertices[i * width + j * 6 + 0][0] * tex_scale;
+			m->texture_coords[i * width + j * 6 + 0][1] = (1 - m->vertices[i * width + j * 6 + 0][2]) * tex_scale;
+
+            m->texture_coords[i * width + j * 6 + 5][0] = m->vertices[i * width + j * 6 + 5][0] * tex_scale;
+			m->texture_coords[i * width + j * 6 + 5][1] = (1 - m->vertices[i * width + j * 6 + 5][2]) * tex_scale;
+
+            m->texture_coords[i * width + j * 6 + 4][0] = m->vertices[i * width + j * 6 + 4][0] * tex_scale;
+			m->texture_coords[i * width + j * 6 + 4][1] = (1 - m->vertices[i * width + j * 6 + 4][2]) * tex_scale;
+
+            m->texture_coords[i * width + j * 6 + 3][0] = m->vertices[i * width + j * 6 + 3][0] * tex_scale;
+			m->texture_coords[i * width + j * 6 + 3][1] = (1 - m->vertices[i * width + j * 6 + 3][2]) * tex_scale;
+
+            for (int k = 0; k < 6; k++) {
+                m->normals[i * width + j * 6 + k][0] = 0.0f;
+                m->normals[i * width + j * 6 + k][1] = 1.0f;
+                m->normals[i * width + j * 6 + k][2] = 0.0f;
+            }
+
+			generate_vertex_tangents_and_bitangents(m, i * width + j * 6);
+			generate_vertex_tangents_and_bitangents(m, i * width + j * 6 + 3);
+        }
+    }
+
+    // left and right sides
+    for (int i = 0; i < 2; i++) {
+        m->vertices[subdivisions * width + i * 6 + 0 + (i*2)][0] = i * subdivisions * tile_size;
+        m->vertices[subdivisions * width + i * 6 + 0 + (i*2)][1] = 0.0f;
+        m->vertices[subdivisions * width + i * 6 + 0 + (i*2)][2] = subdivisions * tile_size;
+
+        m->vertices[subdivisions * width + i * 6 + 1][0] = i * subdivisions * tile_size;
+        m->vertices[subdivisions * width + i * 6 + 1][1] = 0.0f;
+        m->vertices[subdivisions * width + i * 6 + 1][2] = 0.0f;
+
+        m->vertices[subdivisions * width + i * 6 + 2 - (i*2)][0] = i * subdivisions * tile_size;
+        m->vertices[subdivisions * width + i * 6 + 2 - (i*2)][1] = tile_size * -10.0f;
+        m->vertices[subdivisions * width + i * 6 + 2 - (i*2)][2] = 0.0f;
+
+        m->vertices[subdivisions * width + i * 6 + 3 + (i*2)][0] = i * subdivisions * tile_size;
+        m->vertices[subdivisions * width + i * 6 + 3 + (i*2)][1] = 0.0f;
+        m->vertices[subdivisions * width + i * 6 + 3 + (i*2)][2] = subdivisions * tile_size;
+
+        m->vertices[subdivisions * width + i * 6 + 4][0] = i * subdivisions * tile_size;
+        m->vertices[subdivisions * width + i * 6 + 4][1] = tile_size * -10.0f;
+        m->vertices[subdivisions * width + i * 6 + 4][2] = 0.0f;
+
+        m->vertices[subdivisions * width + i * 6 + 5 - (i*2)][0] = i * subdivisions * tile_size;
+        m->vertices[subdivisions * width + i * 6 + 5 - (i*2)][1] = tile_size * -10.0f;
+        m->vertices[subdivisions * width + i * 6 + 5 - (i*2)][2] = subdivisions * tile_size;
+    }
+
+    // front and back sides
+    for (int i = 2; i < 4; i++) {
+        m->vertices[subdivisions * width + i * 6 + 0 + ((i-2)*2)][0] = 0.0f;
+        m->vertices[subdivisions * width + i * 6 + 0 + ((i-2)*2)][1] = 0.0f;
+        m->vertices[subdivisions * width + i * 6 + 0 + ((i-2)*2)][2] = (i-2) * subdivisions * tile_size;
+
+        m->vertices[subdivisions * width + i * 6 + 1][0] = subdivisions * tile_size;
+        m->vertices[subdivisions * width + i * 6 + 1][1] = 0.0f;
+        m->vertices[subdivisions * width + i * 6 + 1][2] = (i-2) * subdivisions * tile_size;
+
+        m->vertices[subdivisions * width + i * 6 + 2 - ((i-2)*2)][0] = 0.0f;
+        m->vertices[subdivisions * width + i * 6 + 2 - ((i-2)*2)][1] = tile_size * -10.0f;
+        m->vertices[subdivisions * width + i * 6 + 2 - ((i-2)*2)][2] = (i-2) * subdivisions * tile_size;
+
+        m->vertices[subdivisions * width + i * 6 + 3 + ((i-2)*2)][0] = 0.0f;
+        m->vertices[subdivisions * width + i * 6 + 3 + ((i-2)*2)][1] = tile_size * -10.0f;
+        m->vertices[subdivisions * width + i * 6 + 3 + ((i-2)*2)][2] = (i-2) * subdivisions * tile_size;
+
+        m->vertices[subdivisions * width + i * 6 + 4][0] = subdivisions * tile_size;
+        m->vertices[subdivisions * width + i * 6 + 4][1] = 0.0f;
+        m->vertices[subdivisions * width + i * 6 + 4][2] = (i-2) * subdivisions * tile_size;
+
+        m->vertices[subdivisions * width + i * 6 + 5 - ((i-2)*2)][0] = subdivisions * tile_size;
+        m->vertices[subdivisions * width + i * 6 + 5 - ((i-2)*2)][1] = tile_size * -10.0f;
+        m->vertices[subdivisions * width + i * 6 + 5 - ((i-2)*2)][2] = (i-2) * subdivisions * tile_size;
+    }
+
+    // bottom
+	m->vertices[subdivisions * width + 4 * 6 + 0][0] = 0.0f;
+    m->vertices[subdivisions * width + 4 * 6 + 0][1] = tile_size * -10.0f;
+    m->vertices[subdivisions * width + 4 * 6 + 0][2] = 0.0f;
+
+    m->vertices[subdivisions * width + 4 * 6 + 1][0] = subdivisions * tile_size;
+	m->vertices[subdivisions * width + 4 * 6 + 1][1] = tile_size * -10.0f;
+    m->vertices[subdivisions * width + 4 * 6 + 1][2] = 0.0f;
+
+	m->vertices[subdivisions * width + 4 * 6 + 2][0] = 0.0f;
+	m->vertices[subdivisions * width + 4 * 6 + 2][1] = tile_size * -10.0f;
+	m->vertices[subdivisions * width + 4 * 6 + 2][2] = subdivisions * tile_size;
+
+	m->vertices[subdivisions * width + 4 * 6 + 3][0] = 0.0f;
+	m->vertices[subdivisions * width + 4 * 6 + 3][1] = tile_size * -10.0f;
+	m->vertices[subdivisions * width + 4 * 6 + 3][2] = subdivisions * tile_size;
+
+	m->vertices[subdivisions * width + 4 * 6 + 4][0] = subdivisions * tile_size;
+	m->vertices[subdivisions * width + 4 * 6 + 4][1] = tile_size * -10.0f;
+    m->vertices[subdivisions * width + 4 * 6 + 4][2] = 0.0f;
+
+	m->vertices[subdivisions * width + 4 * 6 + 5][0] = subdivisions * tile_size;
+	m->vertices[subdivisions * width + 4 * 6 + 5][1] = tile_size * -10.0f;
+	m->vertices[subdivisions * width + 4 * 6 + 5][2] = subdivisions * tile_size;
+
+    if (texture_filename) {
+        m->has_texture = true;
+		m->texture_id = loadTexture(texture_filename);
+    }
+
+    return loaded_models_n++;
 }

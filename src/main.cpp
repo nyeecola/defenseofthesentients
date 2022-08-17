@@ -218,28 +218,18 @@ void ray_plane_intersection(vec3 ray_origin, vec3 ray_dir,
 
 // TODO: put all this state in a struct
 void render_scene(float width, float height, float mouse_x, float mouse_y,
-                  Camera camera, Light *light, mat4 view_mat,
+                  vec3 camera_pos, Light *light, mat4 proj_mat, mat4 view_mat,
                   Object **scene_geometry, int num_scene_geom,
-                  GLuint program, RenderPass pass) {
-    float ratio = width / height;
-
-    // TODO: move this out
-    float far_plane = 300.0f;
-
-    mat4 proj_mat;
-
+                  GLuint program, RenderPass pass)
+{
     glUseProgram(program);
 
     switch (pass) {
-    case PASS_FINAL: {
-        glm_perspective(GLM_PI_4f, ratio, 0.01f, far_plane, proj_mat);
-        glDisable(GL_CULL_FACE); // TODO: reenable
-        //glEnable(GL_CULL_FACE); // TODO: reenable
-        glCullFace(GL_FRONT);
+    case PASS_FINAL:
+        glEnable(GL_CULL_FACE);
+        glCullFace(GL_BACK);
         break;
-    }
     case PASS_SHADOW_MAP:
-        glm_perspective(GLM_PI_2f, ratio, 0.01f, far_plane, proj_mat);
         glEnable(GL_CULL_FACE);
         glCullFace(GL_FRONT);
         break;
@@ -266,7 +256,7 @@ void render_scene(float width, float height, float mouse_x, float mouse_y,
         glUniform1i(glGetUniformLocation(program, "textureA"), 2);
         glUniform1i(glGetUniformLocation(program, "normalMap"), 3);
         glUniformMatrix4fv(glGetUniformLocation(program, "shadow_map_matrix"), 1, GL_FALSE, (const GLfloat*)light->shadow_map_matrix);
-		glUniform3fv(glGetUniformLocation(program, "cameraPos"), 1, camera.pos);
+		glUniform3fv(glGetUniformLocation(program, "cameraPos"), 1, camera_pos);
         break;
     case PASS_SHADOW_MAP:
 		glUniform3fv(glGetUniformLocation(program, "cameraPos"), 1, light->pos);
@@ -287,7 +277,7 @@ void render_scene(float width, float height, float mouse_x, float mouse_y,
 			if (pass == PASS_FINAL) { // we don't care about the grid when doing shadow mapping
 				glUniform1i(glGetUniformLocation(program, "gridEnabled"), grid_enabled);
                 vec3 ray_origin, ray_dir;
-                screen_to_world_space_ray(camera.pos, mouse_x, mouse_y,
+                screen_to_world_space_ray(camera_pos, mouse_x, mouse_y,
                                           proj_mat, view_mat,
                                           ray_origin, ray_dir);
                 vec3 plane_normal = { 0.0, 1.0, 0.0 };
@@ -309,7 +299,7 @@ void render_scene(float width, float height, float mouse_x, float mouse_y,
         // one frame delayed because of this coupling.
         // move the light with the mouse
         vec3 ray_origin, ray_dir;
-        screen_to_world_space_ray(camera.pos, mouse_x, mouse_y,
+        screen_to_world_space_ray(camera_pos, mouse_x, mouse_y,
             proj_mat, view_mat,
             ray_origin, ray_dir);
         vec3 plane_normal = { 0.0, 1.0, 0.0 };
@@ -361,21 +351,23 @@ void initialize_shadow_map_fbo(GLuint *fbo, GLuint *tex, Light light)
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
 }
 
-void shadow_mapping_pass(GLuint fbo, GLuint tex, Object **scene_geometry,
-                         int obj_count, GLuint program, Light *light, Camera camera)
+void shadow_mapping_pass(int width, int height, GLuint fbo, GLuint tex,
+                         Object **scene_geometry, int obj_count,
+                         GLuint program, Light *light)
 {
-    
-    mat4 view_mat;
+    mat4 proj_mat, view_mat;
+    glm_perspective(GLM_PI_2f, 1, 0.01f, FAR_PLANE, proj_mat);
 
     glBindFramebuffer(GL_FRAMEBUFFER, fbo);
     switch (light->type) {
     case SPOTLIGHT:
     case DIRECTIONAL: {
-        vec3 camera_target = { 5, 0, 5 };
-        glm_lookat(light->pos, camera_target, camera.up, view_mat);
+		vec3 up = { 0, 1, 0 };
+		vec3 target = { 5, 0, 5 };
+		glm_lookat(light->pos, target, up, view_mat);
         glFramebufferTexture2D(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_TEXTURE_2D, tex, 0);
         render_scene(SHADOW_MAP_RESOLUTION, SHADOW_MAP_RESOLUTION,
-                     0, 0, camera, light, view_mat, scene_geometry,
+                     0, 0, light->pos, light, proj_mat, view_mat, scene_geometry,
                      obj_count, program, PASS_SHADOW_MAP);
         break;
     }
@@ -404,7 +396,7 @@ void shadow_mapping_pass(GLuint fbo, GLuint tex, Object **scene_geometry,
             glFramebufferTexture2D(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT,
                                    GL_TEXTURE_CUBE_MAP_POSITIVE_X + i, tex, 0);
             render_scene(SHADOW_MAP_RESOLUTION, SHADOW_MAP_RESOLUTION,
-                         0, 0, camera, light, view_mat,
+                         0, 0, light->pos, light, proj_mat, view_mat,
                          scene_geometry, obj_count, program, PASS_SHADOW_MAP);
         }
         break;
@@ -418,7 +410,8 @@ void shadow_mapping_pass(GLuint fbo, GLuint tex, Object **scene_geometry,
 
 void final_render(float width, float height, float mouse_x, float mouse_y,
                   Camera camera, Light *light, Object **scene_geometry,
-                  int obj_count, GLuint program, GLuint shadow_map_tex, GLuint dither_tex)
+                  int obj_count, GLuint program, GLuint shadow_map_tex,
+                  GLuint dither_tex)
 {
     GLuint tex_type = light->type == POINTLIGHT ? GL_TEXTURE_CUBE_MAP : GL_TEXTURE_2D;
 
@@ -427,12 +420,9 @@ void final_render(float width, float height, float mouse_x, float mouse_y,
     glActiveTexture(GL_TEXTURE1);
     glBindTexture(GL_TEXTURE_2D, dither_tex);
 
-    mat4 view_mat;
-    glm_lookat(camera.pos, *camera.target, camera.up, view_mat);
-
-    render_scene(width, height, mouse_x, mouse_y, camera,
-                 light, view_mat, scene_geometry, obj_count,
-                 program, PASS_FINAL);
+    render_scene(width, height, mouse_x, mouse_y, camera.pos,
+                 light, camera.proj_mat, camera.view_mat,
+                 scene_geometry, obj_count, program, PASS_FINAL);
 
     glBindTexture(GL_TEXTURE_2D, 0);
 }
@@ -458,6 +448,12 @@ Camera create_targeted_camera(vec3 pos, vec3* target)
     glm_vec3_copy(up, camera.up);
     camera.target = target;
     return camera;
+}
+
+void update_camera_matrices(int width, int height, Camera* camera)
+{
+    glm_lookat(camera->pos, *camera->target, camera->up, camera->view_mat);
+    glm_perspective(GLM_PI_4f, (float)width / height, 0.01f, FAR_PLANE, camera->proj_mat);
 }
 
 int main(int argc, char** argv)
@@ -518,14 +514,11 @@ int main(int argc, char** argv)
     int plane_id = loadModel("assets/plane.obj", "assets/ground2.jpg", VERTEX_TEXTURE, true);
     model_add_normal_map(&loaded_models[plane_id], "assets/ground2_normal_map3.jpg");
 #else
-     int plane_id = loadModel("assets/plane.obj", "assets/brickwall_test.jpg", VERTEX_TEXTURE, true);
-    //int plane_id = loadModel("assets/plane.obj", NULL, VERTEX_TEXTURE, false);
-     model_add_normal_map(&loaded_models[plane_id], "assets/brickwall_normal.jpg");
+    int plane_id = loadModel("assets/plane.obj", "assets/brickwall_test.jpg", VERTEX_TEXTURE, true);
+    model_add_normal_map(&loaded_models[plane_id], "assets/brickwall_normal.jpg");
 #endif
 #else
-    //int plane_id = create_tiled_plane(50, 100.0f, 1/25.0f, "assets/brickwall_test.jpg");
-    // TODO: understand what's going on with the tex scale here...
-    int plane_id = create_tiled_plane(50, 1.0f, 1/1.0f, "assets/brickwall_test.jpg");
+    int plane_id = create_tiled_plane(50, 1.0f, 1/50.0f, "assets/brickwall_test.jpg");
     model_add_normal_map(&loaded_models[plane_id], "assets/brickwall_normal.jpg");
 #endif
 
@@ -632,15 +625,16 @@ int main(int argc, char** argv)
         xpos *= ratio;
         //printf("%lf %lf\n", xpos, ypos);
 
+        update_camera_matrices(width, height, &camera);
+
         // update player direction
         man.dir[0] = xpos;
         man.dir[1] = ypos;
         glm_vec2_normalize(man.dir);
         POLL_GL_ERROR;
         // shadow mapping
-        shadow_mapping_pass(shadow_map_fbo, shadow_map_tex,
-                            scene_geometry, obj_count,
-                            shadow_map_program, &light, camera);
+        shadow_mapping_pass(width, height, shadow_map_fbo, shadow_map_tex,
+                            scene_geometry, obj_count, shadow_map_program, &light);
 
 #if 1
         // render actual scene

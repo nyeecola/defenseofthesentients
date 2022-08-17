@@ -94,4 +94,7 @@ struct Camera {
 
     vec3 dir; // CAMERA_FREE
     vec3 *target; // CAMERA_TARGETED
+
+    mat4 view_mat;
+    mat4 proj_mat;
 };

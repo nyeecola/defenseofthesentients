@@ -276,6 +276,8 @@ void render_scene(float width, float height, float mouse_x, float mouse_y,
         if (obj->type == OBJ_GROUND) {
 			if (pass == PASS_FINAL) { // we don't care about the grid when doing shadow mapping
 				glUniform1i(glGetUniformLocation(program, "gridEnabled"), grid_enabled);
+                // TODO: move this out, perhaps use a "RenderState" struct to pass 
+                //       PASS-specific arguments
                 vec3 ray_origin, ray_dir;
                 screen_to_world_space_ray(camera_pos, mouse_x, mouse_y,
                                           proj_mat, view_mat,
@@ -292,22 +294,6 @@ void render_scene(float width, float height, float mouse_x, float mouse_y,
             // draw_model_force_rgb(program, *obj, 0.8, 0.6, 0.4);
             draw_model(program, *obj, pass);
         }
-    }
-
-    if (pass == PASS_FINAL) {
-        // TODO: separate this from the rendering, currently it's also
-        // one frame delayed because of this coupling.
-        // move the light with the mouse
-        vec3 ray_origin, ray_dir;
-        screen_to_world_space_ray(camera_pos, mouse_x, mouse_y,
-            proj_mat, view_mat,
-            ray_origin, ray_dir);
-        vec3 plane_normal = { 0.0, 1.0, 0.0 };
-        vec3 target_pos;
-        ray_plane_intersection(ray_origin, ray_dir, plane_normal,
-            light->pos[1], target_pos);
-        if (glm_vec3_norm(target_pos) > 0.95f)
-            glm_vec3_copy(target_pos, light->pos);
     }
 }
 
@@ -626,6 +612,18 @@ int main(int argc, char** argv)
         //printf("%lf %lf\n", xpos, ypos);
 
         update_camera_matrices(width, height, &camera);
+
+        // mouse picking for light position
+        vec3 ray_origin, ray_dir;
+        screen_to_world_space_ray(camera.pos, nds_x, nds_y,
+                                  camera.proj_mat, camera.view_mat,
+                                  ray_origin, ray_dir);
+        vec3 plane_normal = { 0.0, 1.0, 0.0 };
+        vec3 target_pos;
+        ray_plane_intersection(ray_origin, ray_dir, plane_normal, 0.0f, target_pos);
+        float light_y = light.pos[1];
+        glm_vec3_copy(target_pos, light.pos);
+        light.pos[1] = light_y;
 
         // update player direction
         man.dir[0] = xpos;

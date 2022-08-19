@@ -95,6 +95,7 @@ void main() {
 	} else {
         norm = normalize(normal);
 	}
+    //gl_FragColor = vec4(normal, 1.0);
 
     //gl_FragColor = vec4(texture(normalMap, texCoords).rgb * 2.0 - 1.0, 1.0);
     //gl_FragColor = vec4(abs(TBN[1]), 1.0);
@@ -123,7 +124,9 @@ void main() {
     float attenuation = 10.0 / (dist * dist);
     
     vec3 result = ((diffuseContrib * (1.0 - is_shadowed(fragPos, norm)) * attenuation) + ambientContrib) * objColor;
+    //vec3 result = ((diffuseContrib * (1.0 - 0.0) * attenuation) + ambientContrib) * objColor;
     //vec3 result = objColor;
+    //gl_FragColor = vec4(is_shadowed(fragPos, norm), 0.0, 0.0, 1.0);
 
     // draw grid
     //if (gridEnabled) {

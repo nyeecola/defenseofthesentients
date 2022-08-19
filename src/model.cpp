@@ -259,6 +259,7 @@ Object create_object(ObjectType type, int model_id, float x, float y, float z, f
 	// TODO: perhaps use glGetUniformLocation for vertex indices
     glBindVertexArray(obj.vao);
 	    GLuint vbo1, vbo2, vbo3, vbo4, vbo5;
+        // TODO: free
         glGenBuffers(1, &vbo1);
         glGenBuffers(1, &vbo2);
         glGenBuffers(1, &vbo3);

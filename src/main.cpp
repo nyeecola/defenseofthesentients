@@ -23,6 +23,9 @@
 #include "model.cpp"
 //#include "model2.cpp"
 
+#define MIN2(a,b) ((a < b) ? (a) : (b))
+#define MAX2(a,b) ((a > b) ? (a) : (b))
+
 #define POLL_GL_ERROR poll_gl_error(__FILE__, __LINE__)
 
 void poll_gl_error(const char *file, long long line) {
@@ -504,8 +507,10 @@ int main(int argc, char** argv)
     model_add_normal_map(&loaded_models[plane_id], "assets/brickwall_normal.jpg");
 #endif
 #else
-    int plane_id = create_tiled_plane(50, 1.0f, 1/50.0f, "assets/brickwall_test.jpg");
-    model_add_normal_map(&loaded_models[plane_id], "assets/brickwall_normal.jpg");
+    int num_tiles = 50;
+    float tile_size = 1.0f;
+    int plane_id = create_tiled_plane(num_tiles, tile_size, 1/50.0f, "assets/brickwall_test.jpg");
+    //model_add_normal_map(&loaded_models[plane_id], "assets/brickwall_normal.jpg");
 #endif
 
     // initialize scene geometry
@@ -524,7 +529,7 @@ int main(int argc, char** argv)
     }
 
     // initialize light data
-    Light light = create_light(POINTLIGHT,   0, 3.0, 8.0,   0, 0, 0);
+    Light light = create_light(POINTLIGHT,   0, 8.0, 8.0,   0, 0, 0);
 
     float delta_time = glfwGetTime();
     float last_time = glfwGetTime();
@@ -592,7 +597,6 @@ int main(int argc, char** argv)
         glm_vec3_add(man.pos, dir, man.pos);
         glm_vec3_add(camera.pos, dir, camera.pos);
 
-
         // handle screen resize
         // TODO: don't do this every frame, only when it changes!!
         float ratio;
@@ -625,11 +629,152 @@ int main(int argc, char** argv)
         glm_vec3_copy(target_pos, light.pos);
         light.pos[1] = light_y;
 
+        // mouse picking for raising/lowering terrain
+        // TODO: continue from here, debug normals
+        if (glfwGetMouseButton(window, 0)) {
+            vec3 ray_origin, ray_dir;
+            screen_to_world_space_ray(camera.pos, nds_x, nds_y,
+                                      camera.proj_mat, camera.view_mat,
+                                      ray_origin, ray_dir);
+            vec3 plane_normal = { 0.0, 1.0, 0.0 };
+            vec3 target_pos;
+            ray_plane_intersection(ray_origin, ray_dir, plane_normal, 0.0f, target_pos);
+
+            Model *plane_model = &loaded_models[plane_id];
+            int width = num_tiles * 6;
+            float area = 3.1f;
+            float steepness = 0.6f;
+            for (float step = -area; step < area; step += tile_size) {
+                for (float s2 = -area; s2 < area; s2 += tile_size) {
+                    int x = (target_pos[0] + s2) / tile_size;
+                    int z = (target_pos[2] + step) / tile_size;
+
+                    float dist = sqrt(s2 * s2 + step * step) * steepness;
+                    float level_offset = 0.1f * area / (dist * dist + area);
+
+                    // TODO: adjust normals and tex coords
+                    plane_model->vertices[z * width + x * 6 + 2][1] += level_offset;
+                    if (x > 0) plane_model->vertices[z * width + (x - 1) * 6 + 1][1] += level_offset;
+                    if (x > 0) plane_model->vertices[z * width + (x - 1) * 6 + 5][1] += level_offset;
+                    if (z > 0) plane_model->vertices[(z - 1) * width + x * 6 + 0][1] += level_offset;
+                    if (z > 0) plane_model->vertices[(z - 1) * width + x * 6 + 3][1] += level_offset;
+                    if (x > 0 && z > 0) plane_model->vertices[(z - 1) * width + (x - 1) * 6 + 4][1] += level_offset;
+                }
+            }
+
+            // TODO: fix the corner artifact, and the shadow acne!
+            // TODO: use slightly larger area to smoothen edges of raised/lowered terrain
+            // has to be done only after all vertices were translated
+            area += tile_size * 15;
+            for (float step = -area; step < area; step += tile_size) {
+                for (float s2 = -area; s2 < area; s2 += tile_size) {
+                    int x = (target_pos[0] + s2) / tile_size;
+                    int z = (target_pos[2] + step) / tile_size;
+
+#define P(X,Z) ((Z) * width + (X) * 6 + 2)
+#define V(X,Z) plane_model->vertices[P((X),(Z))]
+                    // TODO: conditionals on border
+                    vec3 O, A, B, C, D, E, F;
+                    glm_vec3_copy(V(x, z), O);
+                    // fprintf(stderr, "x %d, z %d, idx %d\n", x, z, P(x, z));
+
+                    glm_vec3_copy(V(x, z-1), A);
+                    glm_vec3_copy(V(x+1, z-1), B);
+                    glm_vec3_copy(V(x+1, z), C);
+                    glm_vec3_copy(V(x, z+1), D);
+                    glm_vec3_copy(V(x-1, z+1), E);
+                    glm_vec3_copy(V(x-1, z), F);
+                    
+                    // TODO: should we care aboutthe magnitude of these vectors? or should we normalize them?
+                    vec3 OA, OB, OC, OD, OE, OF;
+                    glm_vec3_sub(A, O, OA);
+                    glm_vec3_sub(B, O, OB);
+                    glm_vec3_sub(C, O, OC);
+                    glm_vec3_sub(D, O, OD);
+                    glm_vec3_sub(E, O, OE);
+                    glm_vec3_sub(F, O, OF);
+
+#if 0
+                    glm_vec3_normalize(OA);
+                    glm_vec3_normalize(OB);
+                    glm_vec3_normalize(OC);
+                    glm_vec3_normalize(OD);
+                    glm_vec3_normalize(OE);
+                    glm_vec3_normalize(OF);
+#endif
+
+                    vec3 N1, N2, N3, N4, N5, N6;
+                    glm_vec3_cross(OB, OA, N1);
+                    glm_vec3_cross(OC, OA, N2);
+                    glm_vec3_cross(OD, OC, N3);
+                    glm_vec3_cross(OE, OD, N4);
+                    glm_vec3_cross(OF, OE, N5);
+                    glm_vec3_cross(OA, OF, N6);
+
+#if 0
+                    glm_vec3_normalize(N1);
+                    glm_vec3_normalize(N2);
+                    glm_vec3_normalize(N3);
+                    glm_vec3_normalize(N4);
+                    glm_vec3_normalize(N5);
+                    glm_vec3_normalize(N6);
+#endif
+
+                    vec3 R = GLM_VEC3_ZERO_INIT;
+                    glm_vec3_add(R, N1, R);
+                    glm_vec3_add(R, N2, R);
+                    glm_vec3_add(R, N3, R);
+                    glm_vec3_add(R, N4, R);
+                    glm_vec3_add(R, N5, R);
+                    glm_vec3_add(R, N6, R);
+
+                    glm_vec3_normalize(R);
+#if 1
+                    //smooth
+                    glm_vec3_copy(R, plane_model->normals[z * width + x * 6 + 2]);
+                    glm_vec3_copy(R, plane_model->normals[z * width + (x-1) * 6 + 1]);
+                    glm_vec3_copy(R, plane_model->normals[z * width + (x-1) * 6 + 5]);
+                    glm_vec3_copy(R, plane_model->normals[(z-1) * width + x * 6 + 0]);
+                    glm_vec3_copy(R, plane_model->normals[(z-1) * width + x * 6 + 3]);
+                    glm_vec3_copy(R, plane_model->normals[(z-1) * width + (x-1) * 6 + 4]);
+#else
+                    //flat
+                    glm_vec3_copy(N3, plane_model->normals[z * width + x * 6 + 2]);
+                    glm_vec3_copy(N5, plane_model->normals[z * width + (x - 1) * 6 + 1]);
+                    glm_vec3_copy(N4, plane_model->normals[z * width + (x-1) * 6 + 5]);
+                    glm_vec3_copy(N1, plane_model->normals[(z-1) * width + x * 6 + 0]);
+                    glm_vec3_copy(N2, plane_model->normals[(z-1) * width + x * 6 + 3]);
+                    glm_vec3_copy(N6, plane_model->normals[(z-1) * width + (x-1) * 6 + 4]);
+#endif
+#undef P
+#undef V
+                }
+            }
+
+            // upload new data
+            // TODO: cleanup
+            static GLuint vbo = -1, vbo2 = -1;
+            if (vbo == -1) {
+                // TODO: free
+                glGenBuffers(1, &vbo);
+                glGenBuffers(1, &vbo2);
+            }
+            // TODO: use buffersubdata
+            glBindVertexArray(plane.vao);
+            glBindBuffer(GL_ARRAY_BUFFER, vbo);
+            glBufferData(GL_ARRAY_BUFFER, plane_model->num_faces * 3 * sizeof(vec3), plane_model->vertices, GL_STREAM_DRAW);
+            glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, sizeof(float) * 3, (void*)0);
+            glBindBuffer(GL_ARRAY_BUFFER, vbo2);
+            glBufferData(GL_ARRAY_BUFFER, plane_model->num_faces * 3 * sizeof(vec3), plane_model->normals, GL_STREAM_DRAW);
+            glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, sizeof(float) * 3, (void*)0);
+            glBindVertexArray(0);
+        }
+
         // update player direction
         man.dir[0] = xpos;
         man.dir[1] = ypos;
         glm_vec2_normalize(man.dir);
-        POLL_GL_ERROR;
+
         // shadow mapping
         shadow_mapping_pass(width, height, shadow_map_fbo, shadow_map_tex,
                             scene_geometry, obj_count, shadow_map_program, &light);

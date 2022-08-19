@@ -664,6 +664,8 @@ int main(int argc, char** argv)
 
             // TODO: fix the corner artifact, and the shadow acne!
             // TODO: use slightly larger area to smoothen edges of raised/lowered terrain
+            // TODO: fix corner cases (check boundaries)
+            // TODO: fix corner cases (fix the artifact at the edges of the map)
             // has to be done only after all vertices were translated
             area += tile_size * 15;
             for (float step = -area; step < area; step += tile_size) {
